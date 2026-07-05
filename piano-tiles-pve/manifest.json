@@ -1,0 +1,15 @@
+{
+  "name": "Piano Tiles PvE",
+  "short_name": "Piano Tiles",
+  "description": "Competitive piano tiles game — race an AI opponent across three difficulty levels.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0b14",
+  "theme_color": "#12121f",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

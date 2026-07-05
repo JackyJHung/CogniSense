@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#12121f" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Piano Tiles PvE" />
+<title>Piano Tiles PvE</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="icon" href="icon-192.png" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- Rotate device hint -->
+  <div id="rotate-hint" class="overlay hidden">
+    <div class="overlay-card">
+      <div class="rotate-icon">📱</div>
+      <p>Please rotate your phone to portrait mode to play.</p>
+    </div>
+  </div>
+
+  <!-- Main Menu -->
+  <section id="screen-menu" class="screen">
+    <h1 class="title">🎹 Piano Tiles <span class="accent">PvE</span></h1>
+    <p class="subtitle">Race the AI. Don't miss a tile.</p>
+
+    <label class="field">
+      <span>Your name</span>
+      <input id="player-name" type="text" maxlength="14" placeholder="Player" autocomplete="off" />
+    </label>
+
+    <div class="field">
+      <span>Difficulty</span>
+      <div id="difficulty-select" class="segmented">
+        <button class="seg-btn" data-difficulty="easy">Easy</button>
+        <button class="seg-btn selected" data-difficulty="medium">Medium</button>
+        <button class="seg-btn" data-difficulty="hard">Hard</button>
+      </div>
+    </div>
+
+    <div id="best-score-line" class="best-score">Best: 0</div>
+
+    <button id="btn-start" class="btn btn-primary">▶ Start Game</button>
+    <button id="btn-leaderboard" class="btn btn-secondary">🏆 Leaderboard</button>
+
+    <button id="btn-mute" class="icon-toggle" aria-label="Toggle sound">🔊</button>
+  </section>
+
+  <!-- Countdown -->
+  <div id="countdown" class="overlay hidden">
+    <div id="countdown-number">3</div>
+  </div>
+
+  <!-- Game Screen -->
+  <section id="screen-game" class="screen hidden">
+    <div class="hud">
+      <div class="hud-block you">
+        <span class="hud-label">YOU</span>
+        <span id="hud-score" class="hud-value">0</span>
+      </div>
+      <div class="hud-block combo">
+        <span id="hud-combo" class="combo-value"></span>
+      </div>
+      <div class="hud-block ai">
+        <span class="hud-label">AI</span>
+        <span id="hud-ai-score" class="hud-value">0</span>
+      </div>
+    </div>
+    <div id="race-bar">
+      <div id="race-fill-you" class="race-fill you"></div>
+      <div id="race-fill-ai" class="race-fill ai"></div>
+    </div>
+    <canvas id="game-canvas"></canvas>
+    <button id="btn-pause" class="icon-toggle in-game" aria-label="Pause">⏸</button>
+  </section>
+
+  <!-- Pause overlay -->
+  <div id="screen-pause" class="overlay hidden">
+    <div class="overlay-card">
+      <h2>Paused</h2>
+      <button id="btn-resume" class="btn btn-primary">▶ Resume</button>
+      <button id="btn-quit" class="btn btn-secondary">✖ Quit to Menu</button>
+    </div>
+  </div>
+
+  <!-- Game Over -->
+  <div id="screen-gameover" class="overlay hidden">
+    <div class="overlay-card">
+      <h2 id="result-title">You Win!</h2>
+      <div class="result-scores">
+        <div class="result-score you">
+          <span class="hud-label">YOU</span>
+          <span id="final-score">0</span>
+        </div>
+        <div class="vs">VS</div>
+        <div class="result-score ai">
+          <span class="hud-label">AI</span>
+          <span id="final-ai-score">0</span>
+        </div>
+      </div>
+      <p id="new-best" class="new-best hidden">🌟 New Best Score!</p>
+      <button id="btn-retry" class="btn btn-primary">↻ Retry</button>
+      <button id="btn-gameover-menu" class="btn btn-secondary">☰ Menu</button>
+    </div>
+  </div>
+
+  <!-- Leaderboard -->
+  <div id="screen-leaderboard" class="overlay hidden">
+    <div class="overlay-card wide">
+      <h2>🏆 Leaderboard</h2>
+      <div id="leaderboard-tabs" class="segmented">
+        <button class="seg-btn" data-difficulty="easy">Easy</button>
+        <button class="seg-btn selected" data-difficulty="medium">Medium</button>
+        <button class="seg-btn" data-difficulty="hard">Hard</button>
+      </div>
+      <ol id="leaderboard-list" class="leaderboard-list"></ol>
+      <button id="btn-leaderboard-close" class="btn btn-secondary">Close</button>
+    </div>
+  </div>
+
+</div>
+<script src="game.js"></script>
+</body>
+</html>
