@@ -204,6 +204,47 @@ description would make an item harder to recall.
 Prospective recall rate is reported through `core.stats` like everything else —
 with a 95% interval, and no trend claim until there are enough checks.
 
+## Authentication
+
+Every route except signup, login and the VAPID public key requires a bearer
+token. Signup and login return one:
+
+```json
+{ "user": {...}, "token": "s3cr3t...", "token_type": "bearer", "expires_at": "..." }
+```
+
+Send it as `Authorization: Bearer <token>`. It lasts 30 days.
+
+**What this fixed.** Endpoints used to take `user_id` from the path or body and
+trust it. `GET /reminders/4` returned user 4's reminders to anyone who asked —
+their memory scores, check-ins and risk report, reachable by changing a digit in
+a URL. `backend/tests/test_auth.py` now runs that exact attack as a fully
+logged-in second user and asserts it fails.
+
+Two separate checks, because authentication alone is not enough — an attacker
+with their own valid account is still authenticated:
+
+| Route shape | Check | Failure |
+|---|---|---|
+| `/reminders/{user_id}` | `require_self` — must be your own id | 403 |
+| `/reminders/check/{check_id}` | `owned_or_404` — resource must be yours | 404 |
+| `user_id` in a JSON body | `require_own_id` | 403 |
+
+Resource routes answer **404**, not 403, so the reply does not confirm that
+someone else's record id exists.
+
+**Sessions are opaque tokens, not JWTs.** Only the SHA-256 of a token is stored,
+so a leaked database yields nothing presentable to the API. Logout deletes the
+row, which means it now actually works — previously it cleared localStorage and
+the credential stayed valid indefinitely. `POST /users/logout` with
+`{"all_devices": true}` revokes every session for the account.
+
+**Still worth knowing:** tokens live in `localStorage`, which is readable by any
+XSS on the origin. Moving them to an `HttpOnly` cookie would need CSRF
+protection in exchange. There is no password-change or account-recovery flow,
+and no rate limiting on login — brute-force protection is the next thing to add
+if this ever leaves localhost.
+
 ## Notifications (`/push`)
 
 Reminders arrive with the app closed, via Web Push. Turn them on from the
@@ -270,13 +311,6 @@ real deployment; generate a fresh one there and let subscribers re-register.
 
 ## Phase 2 (next)
 
-- **No authentication.** Every endpoint takes `user_id` in the path and trusts
-  it. Anyone who can reach the API can read or modify any account's reminders,
-  check-ins and reports by changing a number in the URL. This predates the merge
-  and affects the whole API, not just the new routes — but the reminder and push
-  endpoints widen the surface, so it is worth stating plainly. Fixing it means
-  real sessions or tokens across every route and both clients. **Do not expose
-  this server beyond localhost until that exists.**
 - **Recall matching is token overlap**, not meaning. "Ring the dentist" only
   matches "call the dentist about the crown" because "dentist" is a distinctive
   word; a paraphrase sharing no words would be scored as forgotten. Lemma

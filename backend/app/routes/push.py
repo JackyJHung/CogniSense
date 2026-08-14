@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user, require_self
 from app.database import get_db
 from app.models.push import PushSubscription
 from app.models.user import User
@@ -33,16 +34,13 @@ from app.schemas import (
 router = APIRouter(prefix="/push", tags=["push"])
 
 
-def _get_user(db: Session, user_id: int) -> User:
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
-
-
 @router.get("/vapid-public-key")
 def vapid_public_key():
     """The applicationServerKey the browser subscribes with.
+
+    Deliberately unauthenticated: this is a PUBLIC key, it is identical for
+    every user, and the browser needs it before a subscription exists. Nothing
+    is learned by fetching it.
 
     Generated on first call and then stable forever -- rotating it would
     invalidate every existing subscription.
@@ -51,7 +49,11 @@ def vapid_public_key():
 
 
 @router.post("/subscribe", status_code=status.HTTP_201_CREATED)
-def subscribe(payload: PushSubscribeRequest, db: Session = Depends(get_db)):
+def subscribe(
+    payload: PushSubscribeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Register a device. Idempotent on the endpoint.
 
     Re-subscribing with the same endpoint updates the keys in place rather than
@@ -59,7 +61,12 @@ def subscribe(payload: PushSubscribeRequest, db: Session = Depends(get_db)):
     once permission is granted, so a naive insert would violate the unique
     constraint on every page load.
     """
-    user = _get_user(db, payload.user_id)
+    if payload.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only access your own data",
+        )
+    user = current_user
 
     existing = (
         db.query(PushSubscription)
@@ -93,10 +100,21 @@ def subscribe(payload: PushSubscribeRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/unsubscribe")
-def unsubscribe(payload: PushUnsubscribeRequest, db: Session = Depends(get_db)):
-    """Forget a device. Returns 200 whether or not it was registered."""
+def unsubscribe(
+    payload: PushUnsubscribeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Forget a device. Returns 200 whether or not it was registered.
+
+    Scoped to the caller's own rows. Without the user_id filter, knowing an
+    endpoint string was enough to silently switch off someone else's reminder
+    notifications -- a quiet denial of service against a memory aid, which is
+    the one kind of failure the person using it would be least likely to notice.
+    """
     removed = (
         db.query(PushSubscription)
+        .filter(PushSubscription.user_id == current_user.id)
         .filter(PushSubscription.endpoint == payload.endpoint)
         .delete(synchronize_session=False)
     )
@@ -105,8 +123,12 @@ def unsubscribe(payload: PushUnsubscribeRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/status/{user_id}", response_model=PushStatusOut)
-def push_status(user_id: int, db: Session = Depends(get_db)):
-    user = _get_user(db, user_id)
+def push_status(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
+):
+    user = current_user
     devices = (
         db.query(PushSubscription).filter(PushSubscription.user_id == user_id).count()
     )
@@ -124,14 +146,17 @@ def push_status(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/test/{user_id}", response_model=PushSendResultOut)
-def send_test(user_id: int, db: Session = Depends(get_db)):
+def send_test(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
+):
     """Push immediately, ignoring cooldown and quiet hours.
 
     Deliberately bypasses both: this is the user pressing a button and expecting
     something to happen. It does NOT update last_push_at, so testing cannot
     suppress the next real reminder.
     """
-    _get_user(db, user_id)
     result = notify_user(db, user_id, {
         "title": "CogniSense notifications are working",
         "body": "This is a test. Real reminders will look like this.",

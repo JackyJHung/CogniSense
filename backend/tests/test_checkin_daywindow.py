@@ -94,6 +94,7 @@ from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
+from app.auth import create_session  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.routes import checkins  # noqa: E402
@@ -116,15 +117,18 @@ def client():
             db.close()
 
     s = TestingSession()
-    s.add(User(id=1, username="tz", hashed_password="x", age=70, gender="female",
-               race="white", wake_time=dtime(7), sleep_time=dtime(22)))
+    user = User(id=1, username="tz", hashed_password="x", age=70, gender="female",
+                race="white", wake_time=dtime(7), sleep_time=dtime(22))
+    s.add(user)
     s.commit()
+    token = create_session(s, user)
     s.close()
 
     app = FastAPI()
     app.include_router(checkins.router)
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
+        c.headers["Authorization"] = f"Bearer {token}"
         yield c
 
 

@@ -14,9 +14,29 @@ import { RemindersPage } from "@/pages/RemindersPage";
 import type { JSX } from "react";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  // Wait for the stored token to be checked against /users/me before deciding.
+  // Without this the redirect wins the race on every page load: `user` starts
+  // null, the check is async, and a perfectly valid session gets bounced to the
+  // login screen. Refreshing any page would log you out.
+  if (loading) return <SessionCheck />;
+
   if (!user) return <Navigate to="/login" replace />;
   return children;
+}
+
+/** Shown for the moment it takes to validate a stored session. */
+function SessionCheck() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <span
+        className="h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-r-transparent"
+        role="status"
+        aria-label="Checking your session"
+      />
+    </div>
+  );
 }
 
 function AnimatedRoutes() {

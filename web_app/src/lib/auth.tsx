@@ -1,42 +1,101 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { User, MorningCheckin } from "./api";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  api,
+  setAuthToken,
+  setUnauthorizedHandler,
+  type MorningCheckin,
+  type User,
+} from "./api";
 
 interface AuthState {
   user: User | null;
   morning: MorningCheckin | null;
+  /** Records a successful login/signup: stores the token AND the user. */
+  signIn: (user: User, token: string) => void;
   setUser: (u: User | null) => void;
   setMorning: (m: MorningCheckin | null) => void;
   logout: () => void;
+  /** True until the stored token has been checked against the server. */
+  loading: boolean;
 }
 
 const STORAGE_KEY = "cognisense.session";
 
 const AuthCtx = createContext<AuthState | null>(null);
 
+function readStored<T>(field: "user" | "morning"): T | null {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    return (JSON.parse(raw)[field] as T) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    try { return JSON.parse(raw).user ?? null; } catch { return null; }
-  });
-  const [morning, setMorning] = useState<MorningCheckin | null>(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    try { return JSON.parse(raw).morning ?? null; } catch { return null; }
-  });
+  const [user, setUser] = useState<User | null>(() => readStored<User>("user"));
+  const [morning, setMorning] = useState<MorningCheckin | null>(() =>
+    readStored<MorningCheckin>("morning"),
+  );
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ user, morning }));
   }, [user, morning]);
 
-  const logout = () => {
+  const clearLocal = useCallback(() => {
     setUser(null);
     setMorning(null);
+    setAuthToken(null);
     localStorage.removeItem(STORAGE_KEY);
-  };
+  }, []);
+
+  // Any 401 from anywhere in the app drops us to the login screen. Without
+  // this, a revoked or expired token leaves the UI rendering a logged-in shell
+  // over endpoints that all fail.
+  useEffect(() => {
+    setUnauthorizedHandler(clearLocal);
+    return () => setUnauthorizedHandler(null);
+  }, [clearLocal]);
+
+  // A stored user object is not proof of a valid session -- the token may have
+  // expired or been revoked on another device. Ask the server who we are before
+  // trusting it.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await api.get<User>("/users/me");
+        if (!cancelled) setUser(me);
+      } catch {
+        if (!cancelled) clearLocal();
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Runs once on mount; the token is read from module state inside api.ts.
+  }, [clearLocal]);
+
+  const signIn = useCallback((u: User, token: string) => {
+    setAuthToken(token);
+    setUser(u);
+  }, []);
+
+  const logout = useCallback(() => {
+    // Tell the server to actually end the session, then clear locally
+    // regardless -- a failed call must not strand the user in a logged-in UI.
+    void api.post("/users/logout", { all_devices: false }).catch(() => undefined);
+    clearLocal();
+  }, [clearLocal]);
 
   return (
-    <AuthCtx.Provider value={{ user, morning, setUser, setMorning, logout }}>
+    <AuthCtx.Provider
+      value={{ user, morning, signIn, setUser, setMorning, logout, loading }}
+    >
       {children}
     </AuthCtx.Provider>
   );

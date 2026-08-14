@@ -18,14 +18,55 @@ class ApiError extends Error {
   }
 }
 
+/* ---------- session token ----------
+ *
+ * Held in a module variable so non-React code (this file) can read it, and
+ * mirrored into localStorage so a reload stays logged in. AuthProvider is the
+ * only thing that should call setAuthToken.
+ */
+const TOKEN_KEY = "cognisense.token";
+
+let authToken: string | null = localStorage.getItem(TOKEN_KEY);
+
+export function setAuthToken(token: string | null): void {
+  authToken = token;
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
+/* Called when the server rejects our token, so the app can drop to the login
+ * screen instead of rendering empty pages and confusing errors. Registered by
+ * AuthProvider; a plain callback because api.ts must stay outside React. */
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  onUnauthorized = fn;
+}
+
+function authHeaders(hasBody: boolean): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (hasBody) headers["Content-Type"] = "application/json";
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+  return headers;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BACKEND_URL}${path}`, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
+    headers: authHeaders(body !== undefined),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
   const parsed = text ? safeJson(text) : null;
+  if (res.status === 401) {
+    // The token is gone, expired, or was revoked elsewhere.
+    setAuthToken(null);
+    onUnauthorized?.();
+  }
   if (!res.ok) throw new ApiError(res.status, parsed ?? text);
   return parsed as T;
 }
@@ -36,9 +77,17 @@ function safeJson(s: string): unknown {
 
 /** Multipart upload — no Content-Type header, the browser sets the boundary. */
 async function requestForm<T>(path: string, form: FormData): Promise<T> {
-  const res = await fetch(`${BACKEND_URL}${path}`, { method: "POST", body: form });
+  const res = await fetch(`${BACKEND_URL}${path}`, {
+    method: "POST",
+    headers: authHeaders(false),
+    body: form,
+  });
   const text = await res.text();
   const parsed = text ? safeJson(text) : null;
+  if (res.status === 401) {
+    setAuthToken(null);
+    onUnauthorized?.();
+  }
   if (!res.ok) throw new ApiError(res.status, parsed ?? text);
   return parsed as T;
 }
@@ -50,6 +99,14 @@ export const api = {
 };
 
 // ---------- Types matching the FastAPI schemas ----------
+
+/** What /users/login and /users/signup return. `token` is shown exactly once. */
+export interface AuthResult {
+  user: User;
+  token: string;
+  token_type: string;
+  expires_at: string;
+}
 
 export interface User {
   id: number;

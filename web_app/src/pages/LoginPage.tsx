@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Disclaimer } from "@/components/Disclaimer";
-import { api, type User } from "@/lib/api";
+import { api, type AuthResult } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { signIn } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,8 +22,8 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const user = await api.post<User>("/users/login", { username, password });
-      setUser(user);
+      const auth = await api.post<AuthResult>("/users/login", { username, password });
+      signIn(auth.user, auth.token);
       navigate("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

@@ -23,6 +23,7 @@ from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
+from app.auth import create_session  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.models.reminder import ReminderCheck, ReminderItem  # noqa: E402
 from app.models.user import User  # noqa: E402
@@ -53,12 +54,14 @@ def client(tmp_path, monkeypatch):
             db.close()
 
     session = TestingSession()
-    session.add(User(
+    user = User(
         id=1, username="tester", hashed_password="x", age=71,
         gender="female", race="white",
         wake_time=time(7, 0), sleep_time=time(22, 30),
-    ))
+    )
+    session.add(user)
     session.commit()
+    token = create_session(session, user)
     session.close()
 
     app = FastAPI()
@@ -66,7 +69,8 @@ def client(tmp_path, monkeypatch):
     app.dependency_overrides[get_db] = override_get_db
 
     with TestClient(app) as c:
-        c.session_factory = TestingSession  # type: ignore[attr-defined]
+        # Every reminder route now requires a bearer token; see app/auth.py.
+        c.headers["Authorization"] = f"Bearer {token}"
         yield c
 
 

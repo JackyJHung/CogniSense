@@ -10,8 +10,14 @@ librosa==0.10.2
 python-multipart==0.0.12
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1  # passlib 1.7.4 is incompatible with bcrypt>=4.1
-python-jose[cryptography]==3.3.0
 pywebpush==2.0.0  # Web Push delivery for reminder notifications
+
+# REMOVED: python-jose[cryptography]==3.3.0
+# It was never imported anywhere. Sessions use opaque random tokens hashed in
+# the database (see app/models/session.py for why that beats JWT here), so
+# nothing needs a JWT library -- pywebpush signs its own VAPID tokens. Dropping
+# it removes an unused dependency that carries known CVEs (GHSA-cjwg-qfpm-7377
+# algorithm confusion, GHSA-6c5p-j8vq-pqhj JWT bomb) for no benefit.
 
 # NOTE: torch/torchaudio above resolve to the CPU build from PyPI, which runs
 # everywhere but ignores an NVIDIA GPU. For CUDA, install requirements-cuda.txt

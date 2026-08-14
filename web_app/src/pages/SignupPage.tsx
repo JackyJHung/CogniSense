@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Disclaimer } from "@/components/Disclaimer";
-import { api, type User } from "@/lib/api";
+import { api, type AuthResult } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 const GENDERS = ["female", "male", "nonbinary", "other", "prefer_not"] as const;
@@ -32,7 +32,7 @@ const GENDER_LABELS: Record<string, string> = {
 
 export function SignupPage() {
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { signIn } = useAuth();
   const [form, setForm] = useState({
     username: "",
     password: "",
@@ -63,8 +63,8 @@ export function SignupPage() {
         wake_time: form.wake_time.length === 5 ? `${form.wake_time}:00` : form.wake_time,
         sleep_time: form.sleep_time.length === 5 ? `${form.sleep_time}:00` : form.sleep_time,
       };
-      const user = await api.post<User>("/users/signup", payload);
-      setUser(user);
+      const auth = await api.post<AuthResult>("/users/signup", payload);
+      signIn(auth.user, auth.token);
       navigate("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-up failed");

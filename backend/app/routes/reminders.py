@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user, owned_or_404, require_own_id, require_self
 from app.database import get_db
 from app.data.research_benchmarks import NON_DIAGNOSTIC_DISCLAIMER
 from app.memory.prospective import (
@@ -66,13 +67,6 @@ RECALL_PROMPT = (
 )
 
 
-def _get_user(db: Session, user_id: int) -> User:
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
-
-
 def _active_items(db: Session, user_id: int) -> list[ReminderItem]:
     return (
         db.query(ReminderItem)
@@ -88,12 +82,16 @@ def _active_items(db: Session, user_id: int) -> list[ReminderItem]:
 # =============================================================================
 
 @router.post("", response_model=ReminderItemOut, status_code=status.HTTP_201_CREATED)
-def create_reminder(payload: ReminderItemCreate, db: Session = Depends(get_db)):
+def create_reminder(
+    payload: ReminderItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Save something the user intends to do."""
-    _get_user(db, payload.user_id)
+    require_own_id(payload.user_id, current_user)
 
     item = ReminderItem(
-        user_id=payload.user_id,
+        user_id=current_user.id,
         description=(payload.description or "").strip() or None,
         label=(payload.label or "").strip() or None,
         due_at=payload.due_at,
@@ -110,6 +108,7 @@ async def upload_reminder_image(
     item_id: int,
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Attach a photo of the thing to be done.
 
@@ -117,9 +116,13 @@ async def upload_reminder_image(
     The client-supplied filename is never used in the path -- it is attacker
     controlled and would otherwise allow directory traversal.
     """
-    item = db.query(ReminderItem).filter(ReminderItem.id == item_id).first()
-    if not item:
-        raise HTTPException(status_code=404, detail="Reminder not found")
+    # Keyed by item id, so authentication alone is not enough: without this
+    # ownership check any logged-in user could overwrite the photo on someone
+    # else's reminder by guessing an id.
+    item = owned_or_404(
+        db.query(ReminderItem).filter(ReminderItem.id == item_id).first(),
+        current_user, "Reminder",
+    )
 
     suffix = Path(image.filename or "").suffix.lower()
     if suffix not in ALLOWED_IMAGE_SUFFIXES:
@@ -147,8 +150,8 @@ def list_reminders(
     user_id: int,
     status_filter: str = Query(STATUS_PENDING, pattern="^(pending|done|dismissed|all)$"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
 ):
-    _get_user(db, user_id)
     q = db.query(ReminderItem).filter(ReminderItem.user_id == user_id)
     if status_filter != "all":
         q = q.filter(ReminderItem.status == status_filter)
@@ -156,7 +159,11 @@ def list_reminders(
 
 
 @router.get("/{user_id}/due", response_model=list[ReminderItemOut])
-def due_reminders(user_id: int, db: Session = Depends(get_db)):
+def due_reminders(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
+):
     """Outstanding items that are due now. Drives the client's pop-up.
 
     Items with no due date are always considered due, so a user who never sets
@@ -166,7 +173,6 @@ def due_reminders(user_id: int, db: Session = Depends(get_db)):
     a pop-up. React Native schedules a local notification; the web client polls
     this endpoint. Nothing here pushes.
     """
-    _get_user(db, user_id)
     now = datetime.now(timezone.utc)
     return (
         db.query(ReminderItem)
@@ -184,9 +190,12 @@ def due_reminders(user_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{user_id}/check", response_model=ReminderCheckOut,
              status_code=status.HTTP_201_CREATED)
-def start_check(user_id: int, db: Session = Depends(get_db)):
+def start_check(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
+):
     """Fire a prospective-memory check. Returns the prompt and nothing else."""
-    _get_user(db, user_id)
     items = _active_items(db, user_id)
     if not items:
         raise HTTPException(
@@ -220,11 +229,16 @@ def submit_recall(
     check_id: int,
     payload: ReminderRecallSubmit,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Grade the unprompted recall, then hand back the full list regardless."""
-    check = db.query(ReminderCheck).filter(ReminderCheck.id == check_id).first()
-    if not check:
-        raise HTTPException(status_code=404, detail="Check not found")
+    # Keyed by check id. Without the ownership check, answering someone else's
+    # check would return THEIR reminder list in the response -- the aid step
+    # hands back every item, so this route leaks the most on a missing check.
+    check = owned_or_404(
+        db.query(ReminderCheck).filter(ReminderCheck.id == check_id).first(),
+        current_user, "Check",
+    )
     if check.responded_at is not None:
         raise HTTPException(
             status_code=409,
@@ -269,9 +283,13 @@ def submit_recall(
 
 
 @router.post("/{user_id}/done", response_model=list[ReminderItemOut])
-def mark_done(user_id: int, payload: ReminderDoneUpdate, db: Session = Depends(get_db)):
+def mark_done(
+    user_id: int,
+    payload: ReminderDoneUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
+):
     """Tick off what the user reports having actually done."""
-    _get_user(db, user_id)
     items = (
         db.query(ReminderItem)
         .filter(ReminderItem.user_id == user_id)
@@ -306,9 +324,13 @@ def mark_done(user_id: int, payload: ReminderDoneUpdate, db: Session = Depends(g
 
 
 @router.post("/{user_id}/dismiss", response_model=list[ReminderItemOut])
-def dismiss(user_id: int, payload: ReminderDoneUpdate, db: Session = Depends(get_db)):
+def dismiss(
+    user_id: int,
+    payload: ReminderDoneUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
+):
     """Drop items the user no longer intends to do, without scoring them as done."""
-    _get_user(db, user_id)
     items = (
         db.query(ReminderItem)
         .filter(ReminderItem.user_id == user_id)
@@ -330,10 +352,9 @@ def prospective_score(
     user_id: int,
     window_days: int = Query(14, ge=7, le=90),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
 ):
     """Prospective-recall rate with a 95% interval, and the trend if earned."""
-    _get_user(db, user_id)
-
     checks = (
         db.query(ReminderCheck)
         .filter(ReminderCheck.user_id == user_id)

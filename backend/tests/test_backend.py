@@ -88,9 +88,11 @@ def test_signup_and_login(client):
     }
     r = client.post("/users/signup", json=payload)
     assert r.status_code == 201, r.text
-    user = r.json()
-    assert user["username"] == "test_user_1"
-    assert user["age"] == 70
+    body = r.json()
+    # Signup now issues a session alongside the profile.
+    assert body["user"]["username"] == "test_user_1"
+    assert body["user"]["age"] == 70
+    assert body["token"] and body["token_type"] == "bearer"
 
     # Duplicate signup fails
     r2 = client.post("/users/signup", json=payload)
@@ -99,6 +101,7 @@ def test_signup_and_login(client):
     # Login
     r3 = client.post("/users/login", json={"username": "test_user_1", "password": "securepass"})
     assert r3.status_code == 200
+    assert r3.json()["token"] != body["token"], "each login issues a fresh session"
 
     # Wrong password
     r4 = client.post("/users/login", json={"username": "test_user_1", "password": "wrong"})
@@ -118,7 +121,10 @@ def test_full_daily_flow(client):
     }
     r = client.post("/users/signup", json=payload)
     assert r.status_code == 201, r.text
-    user_id = r.json()["id"]
+    auth = r.json()
+    user_id = auth["user"]["id"]
+    # Everything past signup requires the bearer token.
+    client.headers["Authorization"] = f"Bearer {auth['token']}"
 
     # Morning
     r = client.post("/checkins/morning", json={

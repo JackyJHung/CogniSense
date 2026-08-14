@@ -9,6 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user, owned_or_404, require_own_id, require_self
 from app.database import get_db
 from app.models.user import User
 from app.models.checkin import MorningCheckin, MiddayCheckin, EveningCheckin
@@ -101,7 +102,11 @@ def _morning_to_out(morning: MorningCheckin) -> MorningCheckinOut:
 
 
 @router.get("/morning/today/{user_id}", response_model=MorningCheckinOut)
-def get_today_morning(user_id: int, db: Session = Depends(get_db)):
+def get_today_morning(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
+):
     """Fetch today's morning check-in for a user, if one exists. 404 if not yet submitted today."""
     start, end = _today_bounds()
     morning = (
@@ -117,16 +122,18 @@ def get_today_morning(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/morning", response_model=MorningCheckinOut, status_code=status.HTTP_201_CREATED)
-def create_morning_checkin(payload: MorningCheckinCreate, db: Session = Depends(get_db)):
+def create_morning_checkin(
+    payload: MorningCheckinCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Record the user's planned activities and return 5 image associations to remember.
 
     Enforces ONE morning check-in per user per day. A second POST on the same day returns 409
     with the existing record echoed in the error detail so clients can render it without an
     extra round-trip.
     """
-    user = db.query(User).filter(User.id == payload.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = require_own_id(payload.user_id, current_user)
 
     # Block duplicate morning check-ins on the same calendar day (server-local time).
     # Once submitted, the associations are locked so the evening test grades against the
@@ -185,11 +192,16 @@ async def upload_morning_audio(
     morning_id: int,
     audio: UploadFile = File(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Optional: attach an audio recording of the user reciting their plans."""
-    morning = db.query(MorningCheckin).filter(MorningCheckin.id == morning_id).first()
-    if not morning:
-        raise HTTPException(status_code=404, detail="Morning check-in not found")
+    # Keyed by morning_id: authentication alone would still let any logged-in
+    # user attach a recording to someone else's check-in, and have it scored
+    # into that person's speech biomarker.
+    morning = owned_or_404(
+        db.query(MorningCheckin).filter(MorningCheckin.id == morning_id).first(),
+        current_user, "Morning check-in",
+    )
 
     file_path = AUDIO_DIR / f"morning_{morning_id}_{audio.filename}"
     with open(file_path, "wb") as f:
@@ -212,16 +224,28 @@ async def upload_morning_audio(
 # =============================================================================
 
 @router.post("/midday", response_model=MiddayCheckinOut, status_code=status.HTTP_201_CREATED)
-def create_midday_checkin(payload: MiddayCheckinCreate, db: Session = Depends(get_db)):
+def create_midday_checkin(
+    payload: MiddayCheckinCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Append a midday check-in.
 
     INTENTIONALLY append-only — each POST creates a new row. Users may submit multiple midday
     check-ins per day (e.g. one before lunch, one after) and earlier entries are preserved as
     part of the longitudinal record. Do NOT add an "upsert-by-day" guard here.
     """
-    user = db.query(User).filter(User.id == payload.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = require_own_id(payload.user_id, current_user)
+
+    # If a morning is referenced it must be the caller's own, so a midday row
+    # cannot be hung off someone else's check-in.
+    if payload.morning_checkin_id is not None:
+        owned_or_404(
+            db.query(MorningCheckin).filter(
+                MorningCheckin.id == payload.morning_checkin_id
+            ).first(),
+            current_user, "Morning check-in",
+        )
 
     mc = MiddayCheckin(
         user_id=user.id,
@@ -248,18 +272,25 @@ def create_midday_checkin(payload: MiddayCheckinCreate, db: Session = Depends(ge
 # =============================================================================
 
 @router.post("/evening", response_model=EveningCheckinOut, status_code=status.HTTP_201_CREATED)
-def create_evening_checkin(payload: EveningCheckinCreate, db: Session = Depends(get_db)):
+def create_evening_checkin(
+    payload: EveningCheckinCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Core scoring endpoint. Grades the morning image-association test and computes
     the daily cognitive score via the behavioral model."""
-    user = db.query(User).filter(User.id == payload.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = require_own_id(payload.user_id, current_user)
 
-    morning = db.query(MorningCheckin).filter(MorningCheckin.id == payload.morning_checkin_id).first()
-    if not morning:
-        raise HTTPException(status_code=404, detail="Morning check-in not found")
-    if morning.user_id != user.id:
-        raise HTTPException(status_code=403, detail="Morning check-in does not belong to user")
+    # This route already checked that the morning belonged to the claimed user --
+    # but the claimed user was itself unverified, so the check could be satisfied
+    # by simply claiming to be the morning's owner. Now the identity is proven
+    # first, and owned_or_404 re-states the ownership requirement against it.
+    morning = owned_or_404(
+        db.query(MorningCheckin).filter(
+            MorningCheckin.id == payload.morning_checkin_id
+        ).first(),
+        current_user, "Morning check-in",
+    )
 
     # -------- Grade image-association test --------
     presented = {p["id"]: p for p in morning.presented_associations}

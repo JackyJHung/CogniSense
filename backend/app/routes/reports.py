@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import require_self
 from app.database import get_db
 from app.models.user import User
 from app.models.checkin import EveningCheckin
@@ -23,14 +24,13 @@ def get_risk_comparison(
     user_id: int,
     window_days: int = Query(14, ge=7, le=90),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
 ):
     """
     Compare user's recent cognitive scores (last `window_days` days) against
     their own earlier baseline AND against age/gender/race research benchmarks.
     """
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = current_user
 
     # Naive UTC, matching what SQLite stores in these timestamp columns.
     # datetime.utcnow() is deprecated in 3.12 and emits a DeprecationWarning.
@@ -76,13 +76,13 @@ def get_risk_comparison(
 
 
 @router.get("/daily-suggestions/{user_id}", response_model=DailySuggestionsOut)
-def get_daily_suggestions(user_id: int, db: Session = Depends(get_db)):
+def get_daily_suggestions(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
+):
     """Return 3 research-backed daily prevention suggestions personalized by age."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    suggestions = personalized_suggestions(user.age, elevated_concern=False, n=3)
+    suggestions = personalized_suggestions(current_user.age, elevated_concern=False, n=3)
 
     return DailySuggestionsOut(
         suggestions=suggestions,
@@ -99,12 +99,9 @@ def get_trend(
     user_id: int,
     days: int = Query(30, ge=7, le=180),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_self),
 ):
     """Return a time series of daily cognitive scores for charting."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
     cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
     rows = (
         db.query(EveningCheckin)

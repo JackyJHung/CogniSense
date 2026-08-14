@@ -39,6 +39,19 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class AuthOut(BaseModel):
+    """Returned by signup and login. `token` is shown exactly once."""
+    user: UserOut
+    token: str
+    token_type: str = "bearer"
+    expires_at: datetime
+
+
+class LogoutRequest(BaseModel):
+    # Log out on every device rather than just this one.
+    all_devices: bool = False
+
+
 # ---------- Morning check-in ----------
 
 class MorningCheckinCreate(BaseModel):

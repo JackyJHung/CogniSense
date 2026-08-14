@@ -132,6 +132,7 @@ from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
+from app.auth import create_session  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.models.push import PushSubscription  # noqa: E402
 from app.models.reminder import STATUS_PENDING, ReminderItem  # noqa: E402
@@ -150,15 +151,17 @@ def db(monkeypatch):
     Base.metadata.create_all(bind=engine)
 
     session = Session()
-    session.add(User(
+    user = User(
         id=1, username="pusher", hashed_password="x", age=70, gender="female",
         race="white", wake_time=dtime(7), sleep_time=dtime(22),
         utc_offset_minutes=0,
-    ))
+    )
+    session.add(user)
     session.add(PushSubscription(
         user_id=1, endpoint="https://push.example/abc", p256dh="k", auth="a",
     ))
     session.commit()
+    session.auth_token = create_session(session, user)  # type: ignore[attr-defined]
 
     sent: list[dict] = []
 
@@ -266,6 +269,7 @@ def client(db):
 
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
+        c.headers["Authorization"] = f"Bearer {db.auth_token}"
         yield c
 
 
