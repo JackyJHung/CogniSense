@@ -5,8 +5,15 @@ regardless of which directory it is invoked from.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
+
+# Must be set BEFORE any app module is imported: app.notifications.scheduler
+# reads it at import time. Without this, TestClient(app) triggers the startup
+# hook and a real push loop runs in the background, hitting the database
+# underneath assertions and trying to reach live push services.
+os.environ.setdefault("COGNISENSE_DISABLE_SCHEDULER", "1")
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _REPO_ROOT = _BACKEND.parent

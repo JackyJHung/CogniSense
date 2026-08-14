@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Disclaimer } from "@/components/Disclaimer";
+import { NotificationSettings } from "@/components/NotificationSettings";
 import {
   api,
   type ProspectiveScore,
@@ -254,6 +255,8 @@ export function RemindersPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <NotificationSettings userId={user.id} />
 
           {score && <ScoreCard score={score} />}
         </div>

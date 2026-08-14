@@ -225,6 +225,50 @@ class ReminderDoneUpdate(BaseModel):
     item_ids: list[int]
 
 
+# ---------- Web Push ----------
+
+class PushKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscriptionIn(BaseModel):
+    """Mirrors the browser's PushSubscription.toJSON() shape."""
+    endpoint: str = Field(..., max_length=2000)
+    keys: PushKeys
+
+
+class PushSubscribeRequest(BaseModel):
+    user_id: int
+    subscription: PushSubscriptionIn
+    # Minutes to ADD to UTC for this device's local time; UTC-7 sends -420.
+    # The browser gets it from -new Date().getTimezoneOffset().
+    utc_offset_minutes: int = Field(0, ge=-720, le=840)
+    user_agent: Optional[str] = Field(None, max_length=400)
+
+
+class PushUnsubscribeRequest(BaseModel):
+    endpoint: str = Field(..., max_length=2000)
+
+
+class PushStatusOut(BaseModel):
+    enabled: bool
+    devices: int
+    last_push_at: Optional[datetime] = None
+    cooldown_hours: int
+    quiet_hours: str
+    currently_awake: bool
+    scheduler_running: bool
+
+
+class PushSendResultOut(BaseModel):
+    sent: int
+    failed: int
+    removed: int
+    devices: int
+    detail: Optional[str] = None
+
+
 class ProspectiveScoreOut(BaseModel):
     n_checks: int
     recall_rate: Optional[float] = None

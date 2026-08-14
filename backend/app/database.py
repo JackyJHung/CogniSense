@@ -30,7 +30,9 @@ def get_db():
 
 def init_db():
     """Create all tables. Import models first so they register with Base."""
-    from app.models import user, checkin, image_association, reminder  # noqa: F401
+    from app.models import (  # noqa: F401
+        user, checkin, image_association, reminder, push,
+    )
     Base.metadata.create_all(bind=engine)
     _run_lightweight_migrations()
 
@@ -46,10 +48,23 @@ def _run_lightweight_migrations():
 
     inspector = inspect(engine)
 
-    # users.morning_revisit_count
     user_cols = {c["name"] for c in inspector.get_columns("users")}
+
+    # users.morning_revisit_count
     if "morning_revisit_count" not in user_cols:
         with engine.begin() as conn:
             conn.execute(
                 text("ALTER TABLE users ADD COLUMN morning_revisit_count INTEGER DEFAULT 0 NOT NULL")
             )
+
+    # users.utc_offset_minutes -- added with the push-notification feature.
+    if "utc_offset_minutes" not in user_cols:
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE users ADD COLUMN utc_offset_minutes INTEGER DEFAULT 0 NOT NULL")
+            )
+
+    # users.last_push_at -- nullable, so no DEFAULT is needed.
+    if "last_push_at" not in user_cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN last_push_at DATETIME"))

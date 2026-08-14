@@ -30,5 +30,15 @@ class User(Base):
     # marker, surfaced in the risk report as a small additive modifier.
     morning_revisit_count = Column(Integer, default=0, nullable=False)
 
+    # Minutes to ADD to UTC to reach this user's local time, so UTC-7 is -420.
+    # The browser reports it when subscribing to notifications. Without it the
+    # server has no way to know whether it is the middle of someone's night --
+    # wake_time and sleep_time above are bare clock times with no zone.
+    utc_offset_minutes = Column(Integer, default=0, nullable=False)
+
+    # Cooldown anchor for reminder pushes, so a standing reminder cannot turn
+    # into a notification every minute.
+    last_push_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

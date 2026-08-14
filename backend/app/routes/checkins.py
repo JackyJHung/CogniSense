@@ -2,7 +2,7 @@
 
 import json
 import random
-from datetime import date, datetime, time as dtime, timedelta
+from datetime import datetime, time as dtime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -56,13 +56,38 @@ def _get_behavioral_scorer():
 # MORNING
 # =============================================================================
 
-def _today_bounds() -> tuple[datetime, datetime]:
-    """Return [start, end) of today in server-local time. Used to dedupe morning check-ins per day."""
-    today = date.today()
-    return (
-        datetime.combine(today, dtime.min),
-        datetime.combine(today + timedelta(days=1), dtime.min),
-    )
+def _today_bounds(now_utc: Optional[datetime] = None) -> tuple[datetime, datetime]:
+    """Return [start, end) of the current UTC day, as naive datetimes.
+
+    BUG THIS FIXES. This used to build the window from `date.today()` -- the
+    server's LOCAL date -- and compare it against `timestamp` columns, which
+    SQLite fills from `func.now()` in UTC and returns naive. Whenever the local
+    date and the UTC date disagree, the window pointed at the wrong day and the
+    query below found nothing.
+
+    On this machine (UTC-7) that is every evening from 17:00 local onward: a
+    morning check-in submitted at 18:00 local stores 01:00 UTC the NEXT day,
+    lands outside a window built from the local date, and so:
+      - the duplicate guard silently stops working, letting a user roll a fresh
+        set of image associations and grade the evening test against the wrong
+        morning -- the exact thing the 409 exists to prevent; and
+      - GET /checkins/morning/today/{user_id} returns 404 for a check-in that
+        does exist.
+
+    Naive UTC is returned deliberately, because that is precisely the form
+    SQLite stores and hands back -- see the probe in the commit that introduced
+    this. Mixing an aware datetime into the comparison would work, but keeping
+    both sides in one representation is what makes the code readable.
+
+    LIMITATION: "today" is now a UTC day, so the boundary falls at 17:00 local
+    for a UTC-7 user rather than at their midnight. Doing this properly needs a
+    per-user timezone on the User model, which does not exist yet. This change
+    makes the behaviour correct and consistent; it does not make it local.
+    """
+    now = now_utc or datetime.now(timezone.utc)
+    day = now.astimezone(timezone.utc).date() if now.tzinfo else now.date()
+    start = datetime.combine(day, dtime.min)
+    return start, start + timedelta(days=1)
 
 
 def _morning_to_out(morning: MorningCheckin) -> MorningCheckinOut:

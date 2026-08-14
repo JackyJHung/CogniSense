@@ -1,0 +1,26 @@
+# CUDA build of PyTorch, for machines with an NVIDIA GPU.
+#
+# PyPI serves the CPU-only wheel for torch on Windows, so a plain
+# `pip install -r requirements.txt` gives you torch==2.5.1+cpu and the GPU sits
+# idle. This file pulls the same version from PyTorch's own index instead.
+#
+# Install it AFTER requirements.txt - it replaces torch and torchaudio in place:
+#
+#   pip install -r requirements.txt
+#   pip install -r requirements-cuda.txt
+#
+# Verify:
+#   python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+#
+# cu124 targets CUDA 12.4 and covers Ada (RTX 40-series, sm_89), Ampere
+# (30-series) and Hopper. It needs an NVIDIA driver of 550+ on Windows; the
+# CUDA toolkit itself does NOT need to be installed separately, since the wheel
+# bundles the runtime it needs.
+#
+# On a machine with no NVIDIA GPU this install succeeds but torch then fails to
+# initialise CUDA at runtime - skip this file there and keep the CPU build.
+
+--index-url https://download.pytorch.org/whl/cu124
+
+torch==2.5.1+cu124
+torchaudio==2.5.1+cu124

@@ -33,6 +33,7 @@ cognisense-app/
 │   │   │   ├── validate.py      #   validation harness (nested CV + controls)
 │   │   │   └── text_features.py #   shared tokenisation / recall matching
 │   │   ├── memory/              # prospective-memory checks — the memory aid
+│   │   ├── notifications/       # Web Push: VAPID keys, sender, scheduler
 │   │   ├── reports/             # report templates
 │   │   └── data/                # Research benchmarks (age/gender/race)
 │   ├── tests/
@@ -96,6 +97,26 @@ pip install -r requirements.txt
 python -m app.ml.train_models       # Trains demo models on synthetic data
 uvicorn app.main:app --reload
 ```
+
+### GPU (optional, NVIDIA only)
+
+PyPI serves the **CPU-only** torch wheel on Windows, so the install above leaves
+an NVIDIA card idle. To use it:
+
+```bash
+pip install -r requirements-cuda.txt
+```
+
+Verify:
+
+```bash
+python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+```
+
+`cu124` covers Ada (RTX 40-series), Ampere and Hopper, and needs driver 550+.
+The CUDA toolkit does not need installing separately — the wheel bundles its own
+runtime. Note that both shipped models are small and run fine on CPU; the GPU
+matters when you retrain on a real corpus, and the ceiling there is VRAM.
 
 ### Web app (React + Tailwind + Framer Motion)
 Requires Node.js LTS. Backend must be running on `localhost:8000`.
@@ -183,9 +204,58 @@ description would make an item harder to recall.
 Prospective recall rate is reported through `core.stats` like everything else —
 with a 95% interval, and no trend claim until there are enough checks.
 
-**Scheduling note:** a server cannot raise a pop-up. `GET /reminders/{id}/due`
-reports what is outstanding; the web client polls it and React Native would
-schedule a local notification. Nothing here pushes.
+## Notifications (`/push`)
+
+Reminders arrive with the app closed, via Web Push. Turn them on from the
+"Reminder notifications" card on the reminders page, then press **Send a test**
+to confirm the chain works before relying on it.
+
+How it fits together:
+
+```
+scheduler (in the FastAPI process, every 60s)
+    -> is anything pending and due for this user?
+    -> is it inside their waking hours?
+    -> have they been pushed in the last 6h?
+        -> pywebpush  ->  push service (FCM / Mozilla)  ->  service worker
+                                                              -> notification
+```
+
+**What "closed" actually means.** Be precise about this, because the honest
+answer is not "always":
+
+| State | Notification arrives? |
+|---|---|
+| Tab closed | Yes — the service worker is woken by the push service |
+| Browser closed, phone | Yes on Android; iOS needs the PWA added to the Home Screen (16.4+) |
+| Browser closed, desktop | Only if the browser keeps a background process (Chrome: Settings → System → "Continue running background apps") |
+| Backend stopped | No — the scheduler *is* the sender |
+
+Three rules keep it from becoming spam: a cooldown (default 6h), quiet hours
+taken from the user's own wake/sleep times, and nothing sent when there is
+nothing due. The browser reports its UTC offset when it subscribes, because
+`wake_time` and `sleep_time` are bare clock times with no zone attached — the
+server would otherwise have no idea whether it is 3am for that person.
+
+**The notification never names the items.** It says "You have 3 things saved",
+never what they are. Naming them would hand over the answers to a recall test,
+and would put someone's errands on a lock screen for anyone nearby to read.
+
+Tuning, via environment variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `COGNISENSE_PUSH_TICK_SECONDS` | `60` | how often the scheduler looks |
+| `COGNISENSE_PUSH_COOLDOWN_HOURS` | `6` | minimum gap between pushes |
+| `COGNISENSE_DISABLE_SCHEDULER` | unset | set to `1` to stop the loop (tests do) |
+| `COGNISENSE_VAPID_SUBJECT` | `mailto:admin@cognisense.local` | contact in the VAPID JWT |
+| `COGNISENSE_LOG_LEVEL` | `INFO` | `DEBUG` to trace scheduler decisions |
+
+**The VAPID keypair must stay stable.** It is generated on first use at
+`backend/app/db/vapid_private.pem` (gitignored) and reused forever. Regenerating
+it silently breaks every existing subscription, because browsers pin the
+`applicationServerKey` they subscribed with. Do not copy a development key to a
+real deployment; generate a fresh one there and let subscribers re-register.
 
 ## Core feature set (Phase 1 — this build)
 
@@ -200,14 +270,24 @@ schedule a local notification. Nothing here pushes.
 
 ## Phase 2 (next)
 
-- **Real notification delivery.** The reminder check exists and the `/due`
-  endpoint reports what is outstanding, but nothing pushes yet — the web client
-  has to be open and polling. Needs a service worker for web and
-  local notifications for React Native.
-- **Recall matching is token overlap**, not meaning. "Ring the dentist" does not
-  match "call the dentist" unless the distinctive word carries it. Lemma
-  matching or sentence embeddings would fix this; both add a dependency the
+- **No authentication.** Every endpoint takes `user_id` in the path and trusts
+  it. Anyone who can reach the API can read or modify any account's reminders,
+  check-ins and reports by changing a number in the URL. This predates the merge
+  and affects the whole API, not just the new routes — but the reminder and push
+  endpoints widen the surface, so it is worth stating plainly. Fixing it means
+  real sessions or tokens across every route and both clients. **Do not expose
+  this server beyond localhost until that exists.**
+- **Recall matching is token overlap**, not meaning. "Ring the dentist" only
+  matches "call the dentist about the crown" because "dentist" is a distinctive
+  word; a paraphrase sharing no words would be scored as forgotten. Lemma
+  matching or sentence embeddings would fix it, at the cost of a dependency the
   offline-first desktop client currently avoids.
+- **Notifications need the backend running.** There is no delivery when the
+  server is stopped — see the table above. A always-on host, or a native
+  scheduled task, is what removes that constraint.
+- **Per-user timezones.** The check-in "day" is a UTC day, so it rolls over at
+  17:00 for a UTC-7 user. Push quiet hours *do* use the browser-reported offset;
+  the check-in window does not, because the User model has no timezone field.
 - Biweekly / monthly longitudinal reports with trend charts
 - Attention warning triggered by sustained deviation from benchmarks
 - Alarm-lock mode (phone unlocks only on check-in completion)

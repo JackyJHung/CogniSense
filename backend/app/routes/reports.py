@@ -1,6 +1,6 @@
 """Reports and risk-comparison endpoints."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -32,7 +32,9 @@ def get_risk_comparison(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    cutoff = datetime.utcnow() - timedelta(days=window_days)
+    # Naive UTC, matching what SQLite stores in these timestamp columns.
+    # datetime.utcnow() is deprecated in 3.12 and emits a DeprecationWarning.
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=window_days)
 
     recent_rows = (
         db.query(EveningCheckin)
@@ -103,7 +105,7 @@ def get_trend(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
     rows = (
         db.query(EveningCheckin)
         .filter(EveningCheckin.user_id == user_id)
