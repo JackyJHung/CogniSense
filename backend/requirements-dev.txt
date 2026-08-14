@@ -1,0 +1,12 @@
+# Test-only dependencies.
+#
+# Kept separate from requirements.txt so a production install stays lean.
+# requirements.txt alone cannot run the suite the README documents -- pytest is
+# not a runtime dependency, and httpx is what fastapi's TestClient uses.
+#
+#   pip install -r requirements.txt -r requirements-dev.txt
+
+-r requirements.txt
+
+pytest==8.3.3
+httpx==0.27.2

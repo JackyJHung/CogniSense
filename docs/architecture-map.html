@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CogniSense — Architecture Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --bg-soft: #f3f8fd;
+    --surface: rgba(255, 255, 255, 0.7);
+    --surface-strong: rgba(255, 255, 255, 0.9);
+    --border: rgba(15, 23, 42, 0.08);
+    --text: #0a0e1a;
+    --text-soft: #475569;
+    --text-faint: #94a3b8;
+    --brand-100: oklch(0.94 0.05 225);
+    --brand-200: oklch(0.88 0.09 225);
+    --brand-400: oklch(0.74 0.16 230);
+    --brand-500: oklch(0.68 0.18 230);
+    --brand-600: oklch(0.58 0.18 235);
+    --brand-700: oklch(0.48 0.16 240);
+    --brand-text: #1e3a8a;
+    --rose: #f43f5e;
+    --emerald: #10b981;
+    --amber: #f59e0b;
+    --violet: #8b5cf6;
+    --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000;
+      --bg-soft: #050810;
+      --surface: rgba(255, 255, 255, 0.04);
+      --surface-strong: rgba(255, 255, 255, 0.07);
+      --border: rgba(255, 255, 255, 0.10);
+      --text: #f8fafc;
+      --text-soft: #cbd5e1;
+      --text-faint: #64748b;
+      --brand-text: #93c5fd;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(900px 600px at 0% -10%, color-mix(in oklch, var(--brand-200) 50%, transparent), transparent 60%),
+      radial-gradient(700px 500px at 100% 0%, color-mix(in oklch, var(--brand-100) 60%, transparent), transparent 55%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  @media (prefers-color-scheme: dark) {
+    body {
+      background:
+        radial-gradient(1100px 700px at 0% -10%, color-mix(in oklch, var(--brand-500) 25%, transparent), transparent 65%),
+        radial-gradient(800px 600px at 100% 10%, color-mix(in oklch, var(--brand-700) 18%, transparent), transparent 60%),
+        #000;
+    }
+  }
+  main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 56px 24px 80px;
+  }
+  header h1 {
+    font-size: 40px;
+    margin: 0;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+  header .sub {
+    margin-top: 8px;
+    color: var(--text-soft);
+    font-size: 15px;
+    max-width: 760px;
+    line-height: 1.55;
+  }
+  .meta {
+    margin-top: 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+  .meta span + span { margin-left: 16px; }
+
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
+  .pill {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-soft);
+    backdrop-filter: blur(8px);
+  }
+  .pill.brand { background: color-mix(in oklch, var(--brand-400) 18%, transparent); color: var(--brand-text); border-color: color-mix(in oklch, var(--brand-400) 30%, transparent); }
+
+  h2.section {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--text-faint);
+    margin: 56px 0 16px;
+    font-weight: 600;
+  }
+
+  /* High-level diagram */
+  .diagram {
+    margin-top: 28px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 24px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 30px -12px rgba(15, 23, 42, 0.10);
+  }
+  .clients-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .node {
+    border: 1px solid var(--border);
+    background: var(--surface-strong);
+    border-radius: 14px;
+    padding: 14px 16px;
+    text-align: center;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .node:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -12px color-mix(in oklch, var(--brand-500) 35%, transparent); }
+  .node .title { font-weight: 600; font-size: 14px; }
+  .node .desc  { color: var(--text-soft); font-size: 12px; margin-top: 3px; }
+  .node.client .title { color: var(--brand-text); }
+  .node.server { background: linear-gradient(135deg, color-mix(in oklch, var(--brand-500) 12%, transparent), color-mix(in oklch, var(--brand-700) 8%, transparent)); }
+  .node.db .title { color: var(--emerald); }
+  .node.ml .title { color: var(--violet); }
+
+  .arrows {
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 20px;
+    line-height: 1;
+    padding: 6px 0;
+  }
+  .backend-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .deps-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* Service cards */
+  .services {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 14px;
+  }
+  .service-card {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 18px;
+    padding: 18px 20px;
+    backdrop-filter: blur(10px);
+  }
+  .service-card .head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .service-card .head h3 { font-size: 16px; margin: 0; font-weight: 600; }
+  .service-card .head .meta { margin: 0; font-size: 11px; }
+  .service-card p.role { color: var(--text-soft); font-size: 13px; line-height: 1.5; margin: 6px 0 10px; }
+  ul.modules { margin: 0; padding: 0; list-style: none; }
+  ul.modules li {
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    border: 1px solid transparent;
+    transition: background .12s ease, border-color .12s ease;
+  }
+  ul.modules li:hover { background: color-mix(in oklch, var(--brand-200) 25%, transparent); border-color: color-mix(in oklch, var(--brand-400) 22%, transparent); }
+  ul.modules li .file { font-family: var(--mono); font-size: 11px; color: var(--text-faint); display: block; margin-top: 2px; }
+  ul.modules li .route { color: var(--brand-text); font-family: var(--mono); font-size: 11px; margin-left: 6px; }
+  ul.modules li .name { font-weight: 500; }
+
+  /* Endpoints table */
+  table.endpoints {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 8px;
+    font-size: 13px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+  }
+  table.endpoints th, table.endpoints td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  table.endpoints tr:last-child td { border-bottom: 0; }
+  table.endpoints th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); font-weight: 600; background: var(--surface-strong); }
+  table.endpoints td.path { font-family: var(--mono); font-size: 12.5px; }
+  table.endpoints td.handler { font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); }
+  table.endpoints td.notes { color: var(--text-soft); font-size: 12px; }
+  .method {
+    display: inline-block;
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 10.5px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.04em;
+  }
+  .method.GET  { background: color-mix(in oklch, var(--emerald) 14%, transparent); color: var(--emerald); }
+  .method.POST { background: color-mix(in oklch, var(--brand-500) 18%, transparent); color: var(--brand-text); }
+  .method.PUT, .method.PATCH { background: color-mix(in oklch, var(--amber) 18%, transparent); color: var(--amber); }
+  .method.DELETE { background: color-mix(in oklch, var(--rose) 14%, transparent); color: var(--rose); }
+
+  /* Database */
+  .tables {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .tbl {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 14px 16px;
+    backdrop-filter: blur(8px);
+  }
+  .tbl h4 {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-family: var(--mono);
+    color: var(--emerald);
+  }
+  .tbl .model { font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); margin-bottom: 8px; }
+  .tbl .policy { font-size: 11.5px; color: var(--text-soft); margin: 8px 0 0; font-style: italic; line-height: 1.4; }
+  .tbl .seed { font-size: 11.5px; color: var(--text-soft); margin: 8px 0 0; font-style: italic; }
+  .tbl .col { display: flex; justify-content: space-between; gap: 6px; padding: 4px 0; font-size: 12px; border-bottom: 1px dashed var(--border); }
+  .tbl .col:last-of-type { border-bottom: 0; }
+  .tbl .col .cname { font-family: var(--mono); font-weight: 500; }
+  .tbl .col .ctype { font-family: var(--mono); color: var(--text-faint); font-size: 11px; }
+
+  /* ML pipeline */
+  .ml-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .ml-card {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 14px 16px;
+    backdrop-filter: blur(8px);
+  }
+  .ml-card h4 {
+    margin: 0 0 4px;
+    font-size: 13px;
+    color: var(--violet);
+  }
+  .ml-card .row { font-size: 12px; color: var(--text-soft); margin: 4px 0; line-height: 1.45; }
+  .ml-card .row .k { color: var(--text-faint); margin-right: 6px; }
+  .ml-card .row code, .ml-card .file { font-family: var(--mono); font-size: 11px; }
+  .ml-card .sources { margin: 6px 0 0; padding: 0; list-style: none; }
+  .ml-card .sources li { font-size: 11.5px; padding: 2px 0; color: var(--text-soft); }
+  .ml-card .sources li::before { content: "•"; color: var(--text-faint); margin-right: 6px; }
+
+  /* Flows */
+  .flows { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .flow {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 14px 16px;
+    backdrop-filter: blur(8px);
+  }
+  .flow h4 { margin: 0 0 8px; font-size: 13px; color: var(--brand-text); }
+  .flow ol { margin: 0; padding-left: 18px; }
+  .flow ol li { font-size: 12px; line-height: 1.55; color: var(--text-soft); margin-bottom: 4px; }
+  .flow ol li code { font-family: var(--mono); font-size: 11px; color: var(--text); background: var(--surface-strong); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); }
+
+  /* Filter */
+  .filter-row {
+    display: flex; align-items: center; gap: 10px; margin: 0 0 12px;
+  }
+  .filter-row input {
+    flex: 1; max-width: 360px;
+    font: inherit; font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+  }
+  .filter-row input:focus { border-color: var(--brand-400); box-shadow: 0 0 0 3px color-mix(in oklch, var(--brand-400) 25%, transparent); }
+  .filter-row .hint { font-size: 11px; color: var(--text-faint); }
+
+  footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-faint);
+    text-align: center;
+  }
+  footer a { color: var(--brand-text); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 720px) {
+    main { padding: 32px 16px 60px; }
+    header h1 { font-size: 28px; }
+    .clients-row { grid-template-columns: 1fr; }
+    .deps-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="title"></h1>
+    <p class="sub" id="desc"></p>
+    <div class="meta">
+      <span>v<span id="version"></span></span>
+      <span>generated <span id="generated"></span></span>
+      <span>data: <a href="./architecture-map.json" style="color:inherit">architecture-map.json</a></span>
+    </div>
+    <div class="pills" id="techPills"></div>
+  </header>
+
+  <h2 class="section">Topology</h2>
+  <div class="diagram">
+    <div class="clients-row">
+      <div class="node client"><div class="title">web_app</div><div class="desc">React + Vite + Tailwind v4 + Framer Motion · :5173</div></div>
+      <div class="node client"><div class="title">desktop_app</div><div class="desc">Tkinter (stdlib) · Python-only</div></div>
+      <div class="node client"><div class="title">mobile_app</div><div class="desc">React Native (scaffold)</div></div>
+    </div>
+    <div class="arrows">↓ HTTP / JSON · CORS open ↓</div>
+    <div class="backend-row">
+      <div class="node server"><div class="title">backend — FastAPI + Uvicorn :8000</div>
+        <div class="desc">routers · pydantic schemas · sqlalchemy session · ml inference</div></div>
+    </div>
+    <div class="arrows">↓ ↓</div>
+    <div class="deps-row">
+      <div class="node db"><div class="title">SQLite</div><div class="desc">backend/db/cognisense.db · 5 tables, idempotent ALTER migrations</div></div>
+      <div class="node ml"><div class="title">PyTorch</div><div class="desc">SpeechCNN + BehavioralMLP · lazy-loaded checkpoints</div></div>
+    </div>
+  </div>
+
+  <h2 class="section">Services &amp; modules</h2>
+  <div class="services" id="services"></div>
+
+  <h2 class="section">HTTP endpoints</h2>
+  <div class="filter-row">
+    <input id="endpointFilter" type="search" placeholder="Filter by method, path, or handler…" />
+    <span class="hint" id="endpointCount"></span>
+  </div>
+  <table class="endpoints">
+    <thead><tr><th>Method</th><th>Path</th><th>Handler</th><th>Notes</th></tr></thead>
+    <tbody id="endpointsBody"></tbody>
+  </table>
+
+  <h2 class="section">Database schema</h2>
+  <div class="tables" id="tables"></div>
+
+  <h2 class="section">ML pipeline</h2>
+  <div class="ml-grid" id="mlGrid"></div>
+
+  <h2 class="section">Flows</h2>
+  <div class="flows" id="flows"></div>
+
+  <footer>
+    Self-contained — the JSON shown above is embedded below for offline viewing.
+    Open this file directly (no server required), or fetch <code>architecture-map.json</code> for tooling.
+  </footer>
+</main>
+
+<!--
+  The data block below mirrors docs/architecture-map.json exactly so this page
+  works when opened via file://. If you regenerate the JSON, paste the new
+  contents in here too, or load via fetch when serving over http(s).
+-->
+<script type="application/json" id="archData">
+{
+  "name": "CogniSense",
+  "version": "0.1.0",
+  "generated_at": "2026-05-18",
+  "description": "Early-risk screening for Alzheimer's & related dementias via speech + behavioral biomarkers. Shared FastAPI + PyTorch backend; three independent clients (Tkinter desktop, React web, React Native mobile scaffold).",
+  "tech_stack": {
+    "backend": ["Python 3.12", "FastAPI 0.115", "SQLAlchemy 2.0", "Pydantic v2", "PyTorch 2.5", "librosa", "SQLite"],
+    "web_app": ["React 19", "TypeScript", "Vite 8", "Tailwind CSS v4", "Framer Motion", "React Router", "lucide-react"],
+    "desktop_app": ["Python 3.12", "Tkinter (stdlib)", "requests"],
+    "mobile_app": ["React Native (scaffold)"]
+  },
+  "services": [
+    {
+      "id": "backend",
+      "path": "backend/",
+      "role": "FastAPI server hosting all business logic, ML inference, and persistence.",
+      "port": 8000,
+      "entry": "backend/app/main.py",
+      "modules": [
+        { "id": "main",                     "file": "backend/app/main.py",                          "role": "FastAPI app, CORS, router include, on_startup → init_db" },
+        { "id": "database",                 "file": "backend/app/database.py",                      "role": "SQLite engine, SessionLocal, declarative Base, idempotent column ALTER migrations" },
+        { "id": "schemas",                  "file": "backend/app/schemas.py",                       "role": "Pydantic request/response models (UserCreate/Out, Morning/Midday/Evening, RiskComparison, DailySuggestions)" },
+        { "id": "models.user",              "file": "backend/app/models/user.py",                   "role": "User ORM — demographics, schedule, cumulative aggregates, morning_revisit_count" },
+        { "id": "models.checkin",           "file": "backend/app/models/checkin.py",                "role": "MorningCheckin, MiddayCheckin, EveningCheckin ORMs" },
+        { "id": "models.image_association", "file": "backend/app/models/image_association.py",      "role": "ImageAssociation ORM + 30-item seed pool" },
+        { "id": "routes.users",             "file": "backend/app/routes/users.py",                  "role": "/users signup, login (bcrypt), profile lookup" },
+        { "id": "routes.checkins",          "file": "backend/app/routes/checkins.py",               "role": "/checkins morning (1-per-day), midday (append-only), evening (grading), audio upload" },
+        { "id": "routes.reports",           "file": "backend/app/routes/reports.py",                "role": "/reports risk-comparison, daily-suggestions, trend (time-series)" },
+        { "id": "ml.speech_model",          "file": "backend/app/ml/speech_model.py",               "role": "1D-CNN over MFCC frames → P(concerning speech pattern)" },
+        { "id": "ml.behavioral_model",      "file": "backend/app/ml/behavioral_model.py",           "role": "MLP scoring an 8-feature behavioral vector → normalcy 0..1" },
+        { "id": "ml.train_models",          "file": "backend/app/ml/train_models.py",               "role": "Trains both checkpoints on synthetic data" },
+        { "id": "ml.risk_comparison",       "file": "backend/app/ml/risk_comparison.py",            "role": "Trajectory analysis + demographic benchmark composition → risk-report payload" },
+        { "id": "data.research_benchmarks", "file": "backend/app/data/research_benchmarks.py",      "role": "Age/race/gender prevalence + Lancet 2024 modifiable risk factors + NON_DIAGNOSTIC_DISCLAIMER" }
+      ]
+    },
+    {
+      "id": "web_app",
+      "path": "web_app/",
+      "role": "React + Vite + Tailwind v4 client with Framer Motion transitions.",
+      "port": 5173,
+      "entry": "web_app/src/main.tsx",
+      "modules": [
+        { "id": "main",                     "file": "web_app/src/main.tsx",                       "role": "React 19 root" },
+        { "id": "App",                      "file": "web_app/src/App.tsx",                        "role": "BrowserRouter + AuthProvider + AnimatePresence routes" },
+        { "id": "lib.api",                  "file": "web_app/src/lib/api.ts",                     "role": "fetch wrapper + ApiError + typed schemas for all endpoints" },
+        { "id": "lib.auth",                 "file": "web_app/src/lib/auth.tsx",                   "role": "useAuth context, localStorage session, morning state" },
+        { "id": "lib.utils",                "file": "web_app/src/lib/utils.ts",                   "role": "cn() classname helper" },
+        { "id": "components.Shell",         "file": "web_app/src/components/Shell.tsx",           "role": "CenteredShell + sidebar Shell layouts" },
+        { "id": "components.PageTransition","file": "web_app/src/components/PageTransition.tsx",  "role": "Framer Motion fade/slide wrapper" },
+        { "id": "components.Disclaimer",    "file": "web_app/src/components/Disclaimer.tsx",      "role": "Non-diagnostic warning banner (amber)" },
+        { "id": "ui.Button",                "file": "web_app/src/components/ui/Button.tsx",       "role": "Primary/secondary/ghost/danger button variants" },
+        { "id": "ui.Card",                  "file": "web_app/src/components/ui/Card.tsx",         "role": "Glassy Card / Header / Title / Content / Footer" },
+        { "id": "ui.Input",                 "file": "web_app/src/components/ui/Input.tsx",        "role": "Input, Textarea, Select" },
+        { "id": "ui.Label",                 "file": "web_app/src/components/ui/Label.tsx",        "role": "Form label" },
+        { "id": "pages.Login",              "file": "web_app/src/pages/LoginPage.tsx",            "role": "Username + password → POST /users/login",              "route": "/login" },
+        { "id": "pages.Signup",             "file": "web_app/src/pages/SignupPage.tsx",           "role": "Demographics form → POST /users/signup",               "route": "/signup" },
+        { "id": "pages.Dashboard",          "file": "web_app/src/pages/DashboardPage.tsx",        "role": "Greeting + 5 navigation tiles + sidebar profile",     "route": "/dashboard" },
+        { "id": "pages.Morning",            "file": "web_app/src/pages/MorningPage.tsx",          "role": "Plans + image associations. Once-per-day lock.",      "route": "/morning" },
+        { "id": "pages.Midday",             "file": "web_app/src/pages/MiddayPage.tsx",           "role": "Light recall prompt (append-only entries)",           "route": "/midday" },
+        { "id": "pages.Evening",            "file": "web_app/src/pages/EveningPage.tsx",          "role": "Recall + grade associations, daily score result",     "route": "/evening" },
+        { "id": "pages.Report",             "file": "web_app/src/pages/ReportPage.tsx",           "role": "Risk metrics vs. demographic peers + suggestions",    "route": "/report" },
+        { "id": "pages.Suggestions",        "file": "web_app/src/pages/SuggestionsPage.tsx",      "role": "Daily Lancet-based prevention tips",                  "route": "/suggestions" }
+      ]
+    },
+    {
+      "id": "desktop_app",
+      "path": "desktop_app/",
+      "role": "Python-only Tkinter client. Uses the same backend/.venv. No npm required.",
+      "entry": "desktop_app/main.py",
+      "modules": [
+        { "id": "main", "file": "desktop_app/main.py", "role": "Single-file Tk root with screens: login, signup, dashboard, morning, midday, evening, report, suggestions" }
+      ]
+    },
+    {
+      "id": "mobile_app",
+      "path": "mobile_app/",
+      "role": "React Native scaffold for Android + iOS. Not yet fully wired against the latest backend changes.",
+      "entry": "mobile_app/src/App.js",
+      "modules": [
+        { "id": "App",                  "file": "mobile_app/src/App.js" },
+        { "id": "api",                  "file": "mobile_app/src/api.js" },
+        { "id": "components.Disclaimer","file": "mobile_app/src/components/Disclaimer.js" },
+        { "id": "screens.Login",        "file": "mobile_app/src/screens/LoginScreen.js" },
+        { "id": "screens.Signup",       "file": "mobile_app/src/screens/SignupScreen.js" },
+        { "id": "screens.Dashboard",    "file": "mobile_app/src/screens/DashboardScreen.js" },
+        { "id": "screens.Morning",      "file": "mobile_app/src/screens/MorningScreen.js" },
+        { "id": "screens.Midday",       "file": "mobile_app/src/screens/MiddayScreen.js" },
+        { "id": "screens.Evening",      "file": "mobile_app/src/screens/EveningScreen.js" },
+        { "id": "screens.Report",       "file": "mobile_app/src/screens/ReportScreen.js" },
+        { "id": "screens.Suggestions",  "file": "mobile_app/src/screens/SuggestionsScreen.js" }
+      ]
+    }
+  ],
+  "database": {
+    "engine": "SQLite",
+    "file": "backend/db/cognisense.db",
+    "tables": [
+      {
+        "name": "users",
+        "model": "backend/app/models/user.py:User",
+        "columns": [
+          { "name": "id",                          "type": "INTEGER PK" },
+          { "name": "username",                    "type": "VARCHAR UNIQUE" },
+          { "name": "hashed_password",             "type": "VARCHAR (bcrypt)" },
+          { "name": "age",                         "type": "INTEGER" },
+          { "name": "gender",                      "type": "VARCHAR" },
+          { "name": "race",                        "type": "VARCHAR" },
+          { "name": "wake_time",                   "type": "TIME" },
+          { "name": "sleep_time",                  "type": "TIME" },
+          { "name": "cumulative_recall_score",     "type": "FLOAT" },
+          { "name": "cumulative_checkin_count",    "type": "INTEGER" },
+          { "name": "morning_revisit_count",       "type": "INTEGER (added via migration)" },
+          { "name": "created_at",                  "type": "DATETIME" },
+          { "name": "updated_at",                  "type": "DATETIME" }
+        ]
+      },
+      {
+        "name": "morning_checkins",
+        "model": "backend/app/models/checkin.py:MorningCheckin",
+        "fk": ["users.id"],
+        "policy": "One row per user per calendar day. Subsequent POSTs return 409.",
+        "columns": [
+          { "name": "id",                     "type": "INTEGER PK" },
+          { "name": "user_id",                "type": "FK users.id" },
+          { "name": "timestamp",              "type": "DATETIME" },
+          { "name": "planned_activities",     "type": "TEXT" },
+          { "name": "presented_associations", "type": "JSON  (5 cues)" },
+          { "name": "speech_biomarker_score", "type": "FLOAT NULL" },
+          { "name": "audio_file_path",        "type": "VARCHAR NULL" }
+        ]
+      },
+      {
+        "name": "midday_checkins",
+        "model": "backend/app/models/checkin.py:MiddayCheckin",
+        "fk": ["users.id", "morning_checkins.id"],
+        "policy": "Append-only — multiple per day expected. Earlier entries kept.",
+        "columns": [
+          { "name": "id",                     "type": "INTEGER PK" },
+          { "name": "user_id",                "type": "FK users.id" },
+          { "name": "morning_checkin_id",     "type": "FK morning_checkins.id NULL" },
+          { "name": "timestamp",              "type": "DATETIME" },
+          { "name": "what_user_has_done",     "type": "TEXT" },
+          { "name": "planned_remainder",      "type": "TEXT NULL" },
+          { "name": "response_latency_ms",    "type": "INTEGER NULL" },
+          { "name": "speech_biomarker_score", "type": "FLOAT NULL" }
+        ]
+      },
+      {
+        "name": "evening_checkins",
+        "model": "backend/app/models/checkin.py:EveningCheckin",
+        "fk": ["users.id", "morning_checkins.id"],
+        "columns": [
+          { "name": "id",                          "type": "INTEGER PK" },
+          { "name": "user_id",                     "type": "FK users.id" },
+          { "name": "morning_checkin_id",          "type": "FK morning_checkins.id" },
+          { "name": "timestamp",                   "type": "DATETIME" },
+          { "name": "recalled_activities",         "type": "TEXT" },
+          { "name": "activity_recall_accuracy",    "type": "FLOAT NULL" },
+          { "name": "association_responses",       "type": "JSON" },
+          { "name": "association_accuracy",        "type": "FLOAT" },
+          { "name": "avg_response_latency_ms",     "type": "INTEGER NULL" },
+          { "name": "behavioral_biomarker_score",  "type": "FLOAT NULL" },
+          { "name": "speech_biomarker_score",      "type": "FLOAT NULL" },
+          { "name": "daily_cognitive_score",       "type": "FLOAT NULL  (0..1, displayed as %)" }
+        ]
+      },
+      {
+        "name": "image_associations",
+        "model": "backend/app/models/image_association.py:ImageAssociation",
+        "seed": "30 everyday items; 5 sampled per morning",
+        "columns": [
+          { "name": "id",          "type": "INTEGER PK" },
+          { "name": "object_name", "type": "VARCHAR" },
+          { "name": "cue_word",    "type": "VARCHAR" },
+          { "name": "image_path",  "type": "VARCHAR" },
+          { "name": "category",    "type": "VARCHAR" }
+        ]
+      }
+    ]
+  },
+  "endpoints": [
+    { "method": "GET",  "path": "/",                                       "router": "main",     "handler": "main.py:root" },
+    { "method": "GET",  "path": "/health",                                 "router": "main",     "handler": "main.py:health" },
+    { "method": "POST", "path": "/users/signup",                           "router": "users",    "handler": "routes/users.py:signup",                "notes": "bcrypt 4.0.1 — pinned for passlib compat" },
+    { "method": "POST", "path": "/users/login",                            "router": "users",    "handler": "routes/users.py:login" },
+    { "method": "GET",  "path": "/users/{user_id}",                        "router": "users",    "handler": "routes/users.py:get_user" },
+    { "method": "POST", "path": "/checkins/morning",                       "router": "checkins", "handler": "routes/checkins.py:create_morning_checkin", "notes": "409 if already submitted today" },
+    { "method": "GET",  "path": "/checkins/morning/today/{user_id}",       "router": "checkins", "handler": "routes/checkins.py:get_today_morning",     "notes": "404 when no morning yet today" },
+    { "method": "POST", "path": "/checkins/morning/{morning_id}/audio",    "router": "checkins", "handler": "routes/checkins.py:upload_morning_audio",  "notes": "multipart; runs SpeechScorer" },
+    { "method": "POST", "path": "/checkins/midday",                        "router": "checkins", "handler": "routes/checkins.py:create_midday_checkin", "notes": "Append-only" },
+    { "method": "POST", "path": "/checkins/evening",                       "router": "checkins", "handler": "routes/checkins.py:create_evening_checkin","notes": "Grades + computes daily_cognitive_score" },
+    { "method": "GET",  "path": "/reports/risk-comparison/{user_id}",      "router": "reports",  "handler": "routes/reports.py:get_risk_comparison" },
+    { "method": "GET",  "path": "/reports/daily-suggestions/{user_id}",    "router": "reports",  "handler": "routes/reports.py:get_daily_suggestions" },
+    { "method": "GET",  "path": "/reports/trend/{user_id}",                "router": "reports",  "handler": "routes/reports.py:get_trend",              "notes": "Time-series for charts" }
+  ],
+  "ml_pipeline": {
+    "speech": {
+      "file": "backend/app/ml/speech_model.py",
+      "arch": "1D-CNN",
+      "input": "(batch, 40 MFCCs, 200 frames) — ~5s of 16kHz mono audio via librosa",
+      "output": "P(concerning speech pattern) ∈ [0,1]",
+      "checkpoint": "backend/app/ml/checkpoints/speech_cnn.pt"
+    },
+    "behavioral": {
+      "file": "backend/app/ml/behavioral_model.py",
+      "arch": "MLP",
+      "input": "8-feature vector: activity recall, association accuracy, latency-z, lexical richness, word count, latency variance, check-in consistency, speech score",
+      "output": "normalcy ∈ [0,1]",
+      "checkpoint": "backend/app/ml/checkpoints/behavioral_mlp.pt"
+    },
+    "composition": {
+      "file": "backend/app/ml/risk_comparison.py",
+      "role": "analyze_trajectory(recent vs baseline) + compute_benchmark(age/race/gender) + personalized_suggestions(Lancet 14)"
+    },
+    "benchmarks": {
+      "file": "backend/app/data/research_benchmarks.py",
+      "sources": [
+        "Alzheimer's Association 2024 Facts & Figures",
+        "Matthews et al. 2019 — racial/ethnic ADRD estimates",
+        "CDC MMWR 2023 — Subjective Cognitive Decline",
+        "Lancet 2024 Commission — 14 modifiable risk factors"
+      ]
+    }
+  },
+  "flows": [
+    {
+      "name": "Sign-up",
+      "steps": [
+        "Client form → POST /users/signup with demographics",
+        "Backend bcrypt-hashes password, inserts users row",
+        "Returns UserOut (no hash)"
+      ]
+    },
+    {
+      "name": "Morning check-in",
+      "steps": [
+        "Client → GET /checkins/morning/today/{id} on mount",
+        "If 404 → show form; on submit POST /checkins/morning",
+        "Backend samples 5 ImageAssociation rows, creates MorningCheckin",
+        "Client renders cue/object grid for memorization",
+        "Subsequent visits today get 409 with the existing record echoed"
+      ]
+    },
+    {
+      "name": "Midday",
+      "steps": [
+        "POST /checkins/midday — always inserts a new row",
+        "Earlier entries preserved (append-only)"
+      ]
+    },
+    {
+      "name": "Evening + scoring",
+      "steps": [
+        "POST /checkins/evening with user answers",
+        "Backend grades association answers → assoc_accuracy",
+        "Computes activity recall overlap → act_recall_accuracy",
+        "Builds 8-feature vector → BehavioralScorer.score(feats)",
+        "daily_cognitive_score = 0.45·behav + 0.35·assoc + 0.20·speech",
+        "Writes EveningCheckin, updates User cumulative aggregates",
+        "Client displays score as percentage"
+      ]
+    },
+    {
+      "name": "Risk report",
+      "steps": [
+        "GET /reports/risk-comparison/{id}",
+        "Trajectory: recent vs. earliest baseline scores",
+        "Benchmark: AGE × RACE × GENDER prevalence",
+        "Elevated-concern logic: ≥20% drop OR <0.35 floor (after 14 check-ins)",
+        "Suggestions: Lancet 14 factors weighted by life stage"
+      ]
+    }
+  ]
+}
+</script>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const data = JSON.parse(document.getElementById("archData").textContent);
+
+  // Header
+  $("title").textContent = data.name;
+  $("desc").textContent = data.description;
+  $("version").textContent = data.version;
+  $("generated").textContent = data.generated_at;
+
+  // Tech pills
+  const pillsEl = $("techPills");
+  for (const group of Object.entries(data.tech_stack)) {
+    const [groupName, items] = group;
+    const head = document.createElement("span");
+    head.className = "pill brand";
+    head.textContent = groupName;
+    pillsEl.appendChild(head);
+    items.forEach((t) => {
+      const el = document.createElement("span");
+      el.className = "pill";
+      el.textContent = t;
+      pillsEl.appendChild(el);
+    });
+  }
+
+  // Services
+  const servicesEl = $("services");
+  data.services.forEach((svc) => {
+    const card = document.createElement("section");
+    card.className = "service-card";
+    const port = svc.port ? `<span>:${svc.port}</span>` : "";
+    const entry = svc.entry ? `<span>entry: ${svc.entry}</span>` : "";
+    card.innerHTML = `
+      <div class="head">
+        <h3>${svc.id} <span style="color:var(--text-faint);font-weight:400;font-size:12px">· ${svc.path}</span></h3>
+        <div class="meta">${port}${entry}</div>
+      </div>
+      <p class="role">${svc.role}</p>
+      <ul class="modules"></ul>
+    `;
+    const ul = card.querySelector("ul.modules");
+    svc.modules.forEach((m) => {
+      const li = document.createElement("li");
+      const routeBadge = m.route ? `<span class="route">${m.route}</span>` : "";
+      const role = m.role ? ` — <span style="color:var(--text-soft)">${m.role}</span>` : "";
+      li.innerHTML = `<span class="name">${m.id}</span>${routeBadge}${role}<span class="file">${m.file}</span>`;
+      ul.appendChild(li);
+    });
+    servicesEl.appendChild(card);
+  });
+
+  // Endpoints
+  const epBody = $("endpointsBody");
+  const renderEndpoints = (filter = "") => {
+    const f = filter.trim().toLowerCase();
+    epBody.innerHTML = "";
+    const filtered = data.endpoints.filter((e) => {
+      if (!f) return true;
+      return [e.method, e.path, e.handler, e.notes || ""].join(" ").toLowerCase().includes(f);
+    });
+    filtered.forEach((e) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><span class="method ${e.method}">${e.method}</span></td>
+        <td class="path">${e.path}</td>
+        <td class="handler">${e.handler}</td>
+        <td class="notes">${e.notes || ""}</td>
+      `;
+      epBody.appendChild(tr);
+    });
+    $("endpointCount").textContent = `${filtered.length} of ${data.endpoints.length} endpoints`;
+  };
+  renderEndpoints();
+  $("endpointFilter").addEventListener("input", (e) => renderEndpoints(e.target.value));
+
+  // Tables
+  const tablesEl = $("tables");
+  data.database.tables.forEach((t) => {
+    const card = document.createElement("div");
+    card.className = "tbl";
+    const policy = t.policy ? `<p class="policy">policy: ${t.policy}</p>` : "";
+    const seed = t.seed ? `<p class="seed">seed: ${t.seed}</p>` : "";
+    const fk = t.fk ? `<p class="seed">fk → ${t.fk.join(", ")}</p>` : "";
+    card.innerHTML = `<h4>${t.name}</h4><div class="model">${t.model}</div>`;
+    t.columns.forEach((c) => {
+      const row = document.createElement("div");
+      row.className = "col";
+      row.innerHTML = `<span class="cname">${c.name}</span><span class="ctype">${c.type}</span>`;
+      card.appendChild(row);
+    });
+    card.insertAdjacentHTML("beforeend", fk + policy + seed);
+    tablesEl.appendChild(card);
+  });
+
+  // ML pipeline
+  const mlEl = $("mlGrid");
+  const ml = data.ml_pipeline;
+  const mkML = (title, obj) => {
+    const c = document.createElement("div");
+    c.className = "ml-card";
+    let inner = `<h4>${title}</h4>`;
+    for (const [k, v] of Object.entries(obj)) {
+      if (Array.isArray(v)) {
+        inner += `<ul class="sources">${v.map((s) => `<li>${s}</li>`).join("")}</ul>`;
+      } else {
+        inner += `<div class="row"><span class="k">${k}</span><span>${v}</span></div>`;
+      }
+    }
+    c.innerHTML = inner;
+    return c;
+  };
+  mlEl.appendChild(mkML("Speech model", ml.speech));
+  mlEl.appendChild(mkML("Behavioral model", ml.behavioral));
+  mlEl.appendChild(mkML("Composition", ml.composition));
+  mlEl.appendChild(mkML("Research benchmarks", ml.benchmarks));
+
+  // Flows
+  const flowsEl = $("flows");
+  data.flows.forEach((f) => {
+    const c = document.createElement("div");
+    c.className = "flow";
+    c.innerHTML = `<h4>${f.name}</h4><ol>${f.steps.map((s) => `<li>${s.replace(/`([^`]+)`/g, "<code>$1</code>")}</li>`).join("")}</ol>`;
+    flowsEl.appendChild(c);
+  });
+})();
+</script>
+</body>
+</html>

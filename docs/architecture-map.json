@@ -1,0 +1,274 @@
+{
+  "name": "CogniSense",
+  "version": "0.1.0",
+  "generated_at": "2026-05-18",
+  "description": "Early-risk screening for Alzheimer's & related dementias via speech + behavioral biomarkers. Shared FastAPI + PyTorch backend; three independent clients (Tkinter desktop, React web, React Native mobile scaffold).",
+  "tech_stack": {
+    "backend": ["Python 3.12", "FastAPI 0.115", "SQLAlchemy 2.0", "Pydantic v2", "PyTorch 2.5", "librosa", "SQLite"],
+    "web_app": ["React 19", "TypeScript", "Vite 8", "Tailwind CSS v4", "Framer Motion", "React Router", "lucide-react"],
+    "desktop_app": ["Python 3.12", "Tkinter (stdlib)", "requests"],
+    "mobile_app": ["React Native (scaffold)"]
+  },
+  "services": [
+    {
+      "id": "backend",
+      "path": "backend/",
+      "role": "FastAPI server hosting all business logic, ML inference, and persistence.",
+      "port": 8000,
+      "entry": "backend/app/main.py",
+      "modules": [
+        { "id": "main",                     "file": "backend/app/main.py",                          "role": "FastAPI app, CORS, router include, on_startup → init_db" },
+        { "id": "database",                 "file": "backend/app/database.py",                      "role": "SQLite engine, SessionLocal, declarative Base, idempotent column ALTER migrations" },
+        { "id": "schemas",                  "file": "backend/app/schemas.py",                       "role": "Pydantic request/response models (UserCreate/Out, Morning/Midday/Evening, RiskComparison, DailySuggestions)" },
+        { "id": "models.user",              "file": "backend/app/models/user.py",                   "role": "User ORM — demographics, schedule, cumulative aggregates, morning_revisit_count" },
+        { "id": "models.checkin",           "file": "backend/app/models/checkin.py",                "role": "MorningCheckin, MiddayCheckin, EveningCheckin ORMs" },
+        { "id": "models.image_association", "file": "backend/app/models/image_association.py",      "role": "ImageAssociation ORM + 30-item seed pool" },
+        { "id": "routes.users",             "file": "backend/app/routes/users.py",                  "role": "/users signup, login (bcrypt), profile lookup" },
+        { "id": "routes.checkins",          "file": "backend/app/routes/checkins.py",               "role": "/checkins morning (1-per-day), midday (append-only), evening (grading), audio upload" },
+        { "id": "routes.reports",           "file": "backend/app/routes/reports.py",                "role": "/reports risk-comparison, daily-suggestions, trend (time-series)" },
+        { "id": "ml.speech_model",          "file": "backend/app/ml/speech_model.py",               "role": "1D-CNN over MFCC frames → P(concerning speech pattern)" },
+        { "id": "ml.behavioral_model",      "file": "backend/app/ml/behavioral_model.py",           "role": "MLP scoring an 8-feature behavioral vector → normalcy 0..1" },
+        { "id": "ml.train_models",          "file": "backend/app/ml/train_models.py",               "role": "Trains both checkpoints on synthetic data" },
+        { "id": "ml.risk_comparison",       "file": "backend/app/ml/risk_comparison.py",            "role": "Trajectory analysis + demographic benchmark composition → risk-report payload" },
+        { "id": "data.research_benchmarks", "file": "backend/app/data/research_benchmarks.py",      "role": "Age/race/gender prevalence + Lancet 2024 modifiable risk factors + NON_DIAGNOSTIC_DISCLAIMER" }
+      ]
+    },
+    {
+      "id": "web_app",
+      "path": "web_app/",
+      "role": "React + Vite + Tailwind v4 client with Framer Motion transitions.",
+      "port": 5173,
+      "entry": "web_app/src/main.tsx",
+      "modules": [
+        { "id": "main",                     "file": "web_app/src/main.tsx",                       "role": "React 19 root" },
+        { "id": "App",                      "file": "web_app/src/App.tsx",                        "role": "BrowserRouter + AuthProvider + AnimatePresence routes" },
+        { "id": "lib.api",                  "file": "web_app/src/lib/api.ts",                     "role": "fetch wrapper + ApiError + typed schemas for all endpoints" },
+        { "id": "lib.auth",                 "file": "web_app/src/lib/auth.tsx",                   "role": "useAuth context, localStorage session, morning state" },
+        { "id": "lib.utils",                "file": "web_app/src/lib/utils.ts",                   "role": "cn() classname helper" },
+        { "id": "components.Shell",         "file": "web_app/src/components/Shell.tsx",           "role": "CenteredShell + sidebar Shell layouts" },
+        { "id": "components.PageTransition","file": "web_app/src/components/PageTransition.tsx",  "role": "Framer Motion fade/slide wrapper" },
+        { "id": "components.Disclaimer",    "file": "web_app/src/components/Disclaimer.tsx",      "role": "Non-diagnostic warning banner (amber)" },
+        { "id": "ui.Button",                "file": "web_app/src/components/ui/Button.tsx",       "role": "Primary/secondary/ghost/danger button variants" },
+        { "id": "ui.Card",                  "file": "web_app/src/components/ui/Card.tsx",         "role": "Glassy Card / Header / Title / Content / Footer" },
+        { "id": "ui.Input",                 "file": "web_app/src/components/ui/Input.tsx",        "role": "Input, Textarea, Select" },
+        { "id": "ui.Label",                 "file": "web_app/src/components/ui/Label.tsx",        "role": "Form label" },
+        { "id": "pages.Login",              "file": "web_app/src/pages/LoginPage.tsx",            "role": "Username + password → POST /users/login",              "route": "/login" },
+        { "id": "pages.Signup",             "file": "web_app/src/pages/SignupPage.tsx",           "role": "Demographics form → POST /users/signup",               "route": "/signup" },
+        { "id": "pages.Dashboard",          "file": "web_app/src/pages/DashboardPage.tsx",        "role": "Greeting + 5 navigation tiles + sidebar profile",     "route": "/dashboard" },
+        { "id": "pages.Morning",            "file": "web_app/src/pages/MorningPage.tsx",          "role": "Plans + image associations. Once-per-day lock.",      "route": "/morning" },
+        { "id": "pages.Midday",             "file": "web_app/src/pages/MiddayPage.tsx",           "role": "Light recall prompt (append-only entries)",           "route": "/midday" },
+        { "id": "pages.Evening",            "file": "web_app/src/pages/EveningPage.tsx",          "role": "Recall + grade associations, daily score result",     "route": "/evening" },
+        { "id": "pages.Report",             "file": "web_app/src/pages/ReportPage.tsx",           "role": "Risk metrics vs. demographic peers + suggestions",    "route": "/report" },
+        { "id": "pages.Suggestions",        "file": "web_app/src/pages/SuggestionsPage.tsx",      "role": "Daily Lancet-based prevention tips",                  "route": "/suggestions" }
+      ]
+    },
+    {
+      "id": "desktop_app",
+      "path": "desktop_app/",
+      "role": "Python-only Tkinter client. Uses the same backend/.venv. No npm required.",
+      "entry": "desktop_app/main.py",
+      "modules": [
+        { "id": "main", "file": "desktop_app/main.py", "role": "Single-file Tk root with screens: login, signup, dashboard, morning, midday, evening, report, suggestions" }
+      ]
+    },
+    {
+      "id": "mobile_app",
+      "path": "mobile_app/",
+      "role": "React Native scaffold for Android + iOS. Not yet fully wired against the latest backend changes.",
+      "entry": "mobile_app/src/App.js",
+      "modules": [
+        { "id": "App",                  "file": "mobile_app/src/App.js" },
+        { "id": "api",                  "file": "mobile_app/src/api.js" },
+        { "id": "components.Disclaimer","file": "mobile_app/src/components/Disclaimer.js" },
+        { "id": "screens.Login",        "file": "mobile_app/src/screens/LoginScreen.js" },
+        { "id": "screens.Signup",       "file": "mobile_app/src/screens/SignupScreen.js" },
+        { "id": "screens.Dashboard",    "file": "mobile_app/src/screens/DashboardScreen.js" },
+        { "id": "screens.Morning",      "file": "mobile_app/src/screens/MorningScreen.js" },
+        { "id": "screens.Midday",       "file": "mobile_app/src/screens/MiddayScreen.js" },
+        { "id": "screens.Evening",      "file": "mobile_app/src/screens/EveningScreen.js" },
+        { "id": "screens.Report",       "file": "mobile_app/src/screens/ReportScreen.js" },
+        { "id": "screens.Suggestions",  "file": "mobile_app/src/screens/SuggestionsScreen.js" }
+      ]
+    }
+  ],
+  "database": {
+    "engine": "SQLite",
+    "file": "backend/db/cognisense.db",
+    "tables": [
+      {
+        "name": "users",
+        "model": "backend/app/models/user.py:User",
+        "columns": [
+          { "name": "id",                          "type": "INTEGER PK" },
+          { "name": "username",                    "type": "VARCHAR UNIQUE" },
+          { "name": "hashed_password",             "type": "VARCHAR (bcrypt)" },
+          { "name": "age",                         "type": "INTEGER" },
+          { "name": "gender",                      "type": "VARCHAR" },
+          { "name": "race",                        "type": "VARCHAR" },
+          { "name": "wake_time",                   "type": "TIME" },
+          { "name": "sleep_time",                  "type": "TIME" },
+          { "name": "cumulative_recall_score",     "type": "FLOAT" },
+          { "name": "cumulative_checkin_count",    "type": "INTEGER" },
+          { "name": "morning_revisit_count",       "type": "INTEGER (added via migration)" },
+          { "name": "created_at",                  "type": "DATETIME" },
+          { "name": "updated_at",                  "type": "DATETIME" }
+        ]
+      },
+      {
+        "name": "morning_checkins",
+        "model": "backend/app/models/checkin.py:MorningCheckin",
+        "fk": ["users.id"],
+        "policy": "One row per user per calendar day. Subsequent POSTs return 409.",
+        "columns": [
+          { "name": "id",                     "type": "INTEGER PK" },
+          { "name": "user_id",                "type": "FK users.id" },
+          { "name": "timestamp",              "type": "DATETIME" },
+          { "name": "planned_activities",     "type": "TEXT" },
+          { "name": "presented_associations", "type": "JSON  (5 cues)" },
+          { "name": "speech_biomarker_score", "type": "FLOAT NULL" },
+          { "name": "audio_file_path",        "type": "VARCHAR NULL" }
+        ]
+      },
+      {
+        "name": "midday_checkins",
+        "model": "backend/app/models/checkin.py:MiddayCheckin",
+        "fk": ["users.id", "morning_checkins.id"],
+        "policy": "Append-only — multiple per day expected. Earlier entries kept.",
+        "columns": [
+          { "name": "id",                     "type": "INTEGER PK" },
+          { "name": "user_id",                "type": "FK users.id" },
+          { "name": "morning_checkin_id",     "type": "FK morning_checkins.id NULL" },
+          { "name": "timestamp",              "type": "DATETIME" },
+          { "name": "what_user_has_done",     "type": "TEXT" },
+          { "name": "planned_remainder",      "type": "TEXT NULL" },
+          { "name": "response_latency_ms",    "type": "INTEGER NULL" },
+          { "name": "speech_biomarker_score", "type": "FLOAT NULL" }
+        ]
+      },
+      {
+        "name": "evening_checkins",
+        "model": "backend/app/models/checkin.py:EveningCheckin",
+        "fk": ["users.id", "morning_checkins.id"],
+        "columns": [
+          { "name": "id",                          "type": "INTEGER PK" },
+          { "name": "user_id",                     "type": "FK users.id" },
+          { "name": "morning_checkin_id",          "type": "FK morning_checkins.id" },
+          { "name": "timestamp",                   "type": "DATETIME" },
+          { "name": "recalled_activities",         "type": "TEXT" },
+          { "name": "activity_recall_accuracy",    "type": "FLOAT NULL" },
+          { "name": "association_responses",       "type": "JSON" },
+          { "name": "association_accuracy",        "type": "FLOAT" },
+          { "name": "avg_response_latency_ms",     "type": "INTEGER NULL" },
+          { "name": "behavioral_biomarker_score",  "type": "FLOAT NULL" },
+          { "name": "speech_biomarker_score",      "type": "FLOAT NULL" },
+          { "name": "daily_cognitive_score",       "type": "FLOAT NULL  (0..1, displayed as %)" }
+        ]
+      },
+      {
+        "name": "image_associations",
+        "model": "backend/app/models/image_association.py:ImageAssociation",
+        "seed": "30 everyday items; 5 sampled per morning",
+        "columns": [
+          { "name": "id",          "type": "INTEGER PK" },
+          { "name": "object_name", "type": "VARCHAR" },
+          { "name": "cue_word",    "type": "VARCHAR" },
+          { "name": "image_path",  "type": "VARCHAR" },
+          { "name": "category",    "type": "VARCHAR" }
+        ]
+      }
+    ]
+  },
+  "endpoints": [
+    { "method": "GET",  "path": "/",                                       "router": "main",     "handler": "main.py:root" },
+    { "method": "GET",  "path": "/health",                                 "router": "main",     "handler": "main.py:health" },
+    { "method": "POST", "path": "/users/signup",                           "router": "users",    "handler": "routes/users.py:signup",                "notes": "bcrypt 4.0.1 — pinned for passlib compat" },
+    { "method": "POST", "path": "/users/login",                            "router": "users",    "handler": "routes/users.py:login" },
+    { "method": "GET",  "path": "/users/{user_id}",                        "router": "users",    "handler": "routes/users.py:get_user" },
+    { "method": "POST", "path": "/checkins/morning",                       "router": "checkins", "handler": "routes/checkins.py:create_morning_checkin", "notes": "409 if already submitted today" },
+    { "method": "GET",  "path": "/checkins/morning/today/{user_id}",       "router": "checkins", "handler": "routes/checkins.py:get_today_morning",     "notes": "404 when no morning yet today" },
+    { "method": "POST", "path": "/checkins/morning/{morning_id}/audio",    "router": "checkins", "handler": "routes/checkins.py:upload_morning_audio",  "notes": "multipart; runs SpeechScorer" },
+    { "method": "POST", "path": "/checkins/midday",                        "router": "checkins", "handler": "routes/checkins.py:create_midday_checkin", "notes": "Append-only" },
+    { "method": "POST", "path": "/checkins/evening",                       "router": "checkins", "handler": "routes/checkins.py:create_evening_checkin","notes": "Grades + computes daily_cognitive_score" },
+    { "method": "GET",  "path": "/reports/risk-comparison/{user_id}",      "router": "reports",  "handler": "routes/reports.py:get_risk_comparison" },
+    { "method": "GET",  "path": "/reports/daily-suggestions/{user_id}",    "router": "reports",  "handler": "routes/reports.py:get_daily_suggestions" },
+    { "method": "GET",  "path": "/reports/trend/{user_id}",                "router": "reports",  "handler": "routes/reports.py:get_trend",              "notes": "Time-series for charts" }
+  ],
+  "ml_pipeline": {
+    "speech": {
+      "file": "backend/app/ml/speech_model.py",
+      "arch": "1D-CNN",
+      "input": "(batch, 40 MFCCs, 200 frames) — ~5s of 16kHz mono audio via librosa",
+      "output": "P(concerning speech pattern) ∈ [0,1]",
+      "checkpoint": "backend/app/ml/checkpoints/speech_cnn.pt"
+    },
+    "behavioral": {
+      "file": "backend/app/ml/behavioral_model.py",
+      "arch": "MLP",
+      "input": "8-feature vector: activity recall, association accuracy, latency-z, lexical richness, word count, latency variance, check-in consistency, speech score",
+      "output": "normalcy ∈ [0,1]",
+      "checkpoint": "backend/app/ml/checkpoints/behavioral_mlp.pt"
+    },
+    "composition": {
+      "file": "backend/app/ml/risk_comparison.py",
+      "role": "analyze_trajectory(recent vs baseline) + compute_benchmark(age/race/gender) + personalized_suggestions(Lancet 14)"
+    },
+    "benchmarks": {
+      "file": "backend/app/data/research_benchmarks.py",
+      "sources": [
+        "Alzheimer's Association 2024 Facts & Figures",
+        "Matthews et al. 2019 — racial/ethnic ADRD estimates",
+        "CDC MMWR 2023 — Subjective Cognitive Decline",
+        "Lancet 2024 Commission — 14 modifiable risk factors"
+      ]
+    }
+  },
+  "flows": [
+    {
+      "name": "Sign-up",
+      "steps": [
+        "Client form → POST /users/signup with demographics",
+        "Backend bcrypt-hashes password, inserts users row",
+        "Returns UserOut (no hash)"
+      ]
+    },
+    {
+      "name": "Morning check-in",
+      "steps": [
+        "Client → GET /checkins/morning/today/{id} on mount",
+        "If 404 → show form; on submit POST /checkins/morning",
+        "Backend samples 5 ImageAssociation rows, creates MorningCheckin",
+        "Client renders cue/object grid for memorization",
+        "Subsequent visits today get 409 with the existing record echoed"
+      ]
+    },
+    {
+      "name": "Midday",
+      "steps": [
+        "POST /checkins/midday — always inserts a new row",
+        "Earlier entries preserved (append-only)"
+      ]
+    },
+    {
+      "name": "Evening + scoring",
+      "steps": [
+        "POST /checkins/evening with user answers",
+        "Backend grades association answers → assoc_accuracy",
+        "Computes activity recall overlap → act_recall_accuracy",
+        "Builds 8-feature vector → BehavioralScorer.score(feats)",
+        "daily_cognitive_score = 0.45·behav + 0.35·assoc + 0.20·speech",
+        "Writes EveningCheckin, updates User cumulative aggregates",
+        "Client displays score as percentage"
+      ]
+    },
+    {
+      "name": "Risk report",
+      "steps": [
+        "GET /reports/risk-comparison/{id}",
+        "Trajectory: recent vs. earliest baseline scores",
+        "Benchmark: AGE × RACE × GENDER prevalence",
+        "Elevated-concern logic: ≥20% drop OR <0.35 floor (after 14 check-ins)",
+        "Suggestions: Lancet 14 factors weighted by life stage"
+      ]
+    }
+  ]
+}

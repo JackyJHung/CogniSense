@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Brand palette — light-blue / sky tones */
+  --color-brand-50:  oklch(0.98 0.02 225);
+  --color-brand-100: oklch(0.94 0.05 225);
+  --color-brand-200: oklch(0.88 0.09 225);
+  --color-brand-300: oklch(0.81 0.13 228);
+  --color-brand-400: oklch(0.74 0.16 230);
+  --color-brand-500: oklch(0.68 0.18 230);
+  --color-brand-600: oklch(0.58 0.18 235);
+  --color-brand-700: oklch(0.48 0.16 240);
+  --color-brand-800: oklch(0.36 0.13 245);
+  --color-brand-900: oklch(0.24 0.08 248);
+
+  /* Accent alias kept = brand so legacy class names still work */
+  --color-accent-400: var(--color-brand-300);
+  --color-accent-500: var(--color-brand-400);
+}
+
+:root {
+  color-scheme: light dark;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+/* Light mode — white surfaces with a subtle sky wash */
+body {
+  margin: 0;
+  background:
+    radial-gradient(900px 600px at 0% -10%,
+      color-mix(in oklch, var(--color-brand-200) 70%, transparent),
+      transparent 60%),
+    radial-gradient(700px 500px at 100% 0%,
+      color-mix(in oklch, var(--color-brand-100) 80%, transparent),
+      transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f3f8fd 100%);
+  color: #0a0e1a;
+}
+
+/* Dark mode — pure black with a quiet blue glow */
+@media (prefers-color-scheme: dark) {
+  body {
+    background:
+      radial-gradient(1100px 700px at 0% -10%,
+        color-mix(in oklch, var(--color-brand-500) 25%, transparent),
+        transparent 65%),
+      radial-gradient(800px 600px at 100% 10%,
+        color-mix(in oklch, var(--color-brand-700) 20%, transparent),
+        transparent 60%),
+      #000000;
+    color: #f8fafc;
+  }
+}
+
+/* Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--color-brand-400) 50%, transparent) transparent;
+}
+
+/* Selection */
+::selection {
+  background: color-mix(in oklch, var(--color-brand-400) 35%, transparent);
+  color: inherit;
+}
