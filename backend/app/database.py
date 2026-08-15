@@ -31,7 +31,7 @@ def get_db():
 def init_db():
     """Create all tables. Import models first so they register with Base."""
     from app.models import (  # noqa: F401
-        user, checkin, image_association, reminder, push, session,
+        user, checkin, image_association, reminder, push, session, security,
     )
     Base.metadata.create_all(bind=engine)
     _run_lightweight_migrations()

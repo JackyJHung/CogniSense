@@ -64,7 +64,7 @@ export function SignupPage() {
         sleep_time: form.sleep_time.length === 5 ? `${form.sleep_time}:00` : form.sleep_time,
       };
       const auth = await api.post<AuthResult>("/users/signup", payload);
-      signIn(auth.user, auth.token);
+      signIn(auth.user);
       navigate("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-up failed");

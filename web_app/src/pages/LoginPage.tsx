@@ -23,7 +23,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       const auth = await api.post<AuthResult>("/users/login", { username, password });
-      signIn(auth.user, auth.token);
+      signIn(auth.user);
       navigate("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -73,6 +73,11 @@ export function LoginPage() {
               No account?{" "}
               <Link to="/signup" className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
                 Create one
+              </Link>
+            </p>
+            <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+              <Link to="/recover" className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
+                Forgotten your password?
               </Link>
             </p>
           </form>

@@ -30,9 +30,10 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional, TypeVar
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.csrf import SESSION_COOKIE
 from app.database import get_db
 from app.models.session import UserSession
 from app.models.user import User
@@ -98,16 +99,27 @@ def _token_from_header(authorization: str | None) -> str | None:
     return value.strip()
 
 
+def session_token_from(request: Request, authorization: str | None) -> str | None:
+    """Two accepted transports, checked in that order.
+
+    The header wins so a native client (desktop, mobile) is unaffected by
+    whatever cookies a shared browser session happens to hold. Browsers use the
+    HttpOnly cookie, which script cannot read -- see app/csrf.py.
+    """
+    return _token_from_header(authorization) or request.cookies.get(SESSION_COOKIE)
+
+
 def get_current_user(
+    request: Request,
     authorization: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
 ) -> User:
-    """Resolve the bearer token to a user, or 401.
+    """Resolve the session token to a user, or 401.
 
     Expired sessions are deleted on sight rather than merely rejected, so the
     table does not accumulate dead rows for users who never log in again.
     """
-    raw = _token_from_header(authorization)
+    raw = session_token_from(request, authorization)
     if raw is None:
         raise UNAUTHENTICATED
 

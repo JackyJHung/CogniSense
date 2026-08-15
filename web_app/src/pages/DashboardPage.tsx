@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Sun, Sunrise, Sunset, Moon, TrendingUp, Sparkles, ListChecks, LogOut } from "lucide-react";
+import { Sun, Sunrise, Sunset, Moon, TrendingUp, Sparkles, ListChecks, ShieldCheck, LogOut } from "lucide-react";
 import { Shell } from "@/components/Shell";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -107,6 +107,11 @@ export function DashboardPage() {
               </dl>
             </CardContent>
           </Card>
+          <Link to="/security" className="block">
+            <Button variant="ghost" className="w-full justify-start">
+              <ShieldCheck className="h-4 w-4" /> Password &amp; recovery
+            </Button>
+          </Link>
           <Button variant="ghost" onClick={onLogout} className="justify-start">
             <LogOut className="h-4 w-4" /> Log out
           </Button>

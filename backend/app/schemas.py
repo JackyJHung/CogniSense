@@ -13,7 +13,10 @@ Race = Literal["white", "black", "hispanic", "aapi", "ai_an", "other", "prefer_n
 
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=32)
-    password: str = Field(..., min_length=6)
+    # Raised from 6 to 8 alongside the password-change and recovery flows, so a
+    # single floor applies wherever a password is set. Existing accounts are
+    # unaffected -- their stored hashes are never re-validated.
+    password: str = Field(..., min_length=8, max_length=200)
     age: int = Field(..., ge=18, le=120)
     gender: Gender
     race: Race
@@ -50,6 +53,41 @@ class AuthOut(BaseModel):
 class LogoutRequest(BaseModel):
     # Log out on every device rather than just this one.
     all_devices: bool = False
+
+
+# Minimum for any NEWLY set password. Applies to signup, password change and
+# recovery alike, so there is one rule rather than three.
+MIN_PASSWORD_LENGTH = 8
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=MIN_PASSWORD_LENGTH, max_length=200)
+
+    @model_validator(mode="after")
+    def must_actually_change(self):
+        if self.current_password == self.new_password:
+            raise ValueError("the new password must be different from the current one")
+        return self
+
+
+class RecoveryCodesOut(BaseModel):
+    """Returned exactly once, at generation. The codes are not stored in clear."""
+    codes: list[str]
+    generated: int
+    warning: str
+
+
+class RecoverRequest(BaseModel):
+    username: str
+    code: str = Field(..., max_length=100)
+    new_password: str = Field(..., min_length=MIN_PASSWORD_LENGTH, max_length=200)
+
+
+class RecoveryStatusOut(BaseModel):
+    codes_remaining: int
+    codes_used: int
+    has_codes: bool
 
 
 # ---------- Morning check-in ----------

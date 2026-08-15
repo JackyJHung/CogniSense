@@ -1,5 +1,9 @@
+/* Same-origin by default: "/api" is proxied to the backend in development (see
+ * vite.config.ts) and served by the backend itself in production. That is a
+ * requirement, not a convenience -- the session cookie is SameSite=Strict, so a
+ * cross-origin API base would mean the browser never sends it. */
 export const BACKEND_URL =
-  (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "http://127.0.0.1:8000";
+  (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? "/api";
 
 class ApiError extends Error {
   status: number;
@@ -18,24 +22,31 @@ class ApiError extends Error {
   }
 }
 
-/* ---------- session token ----------
+/* ---------- session transport ----------
  *
- * Held in a module variable so non-React code (this file) can read it, and
- * mirrored into localStorage so a reload stays logged in. AuthProvider is the
- * only thing that should call setAuthToken.
+ * The session token is NOT held here any more. It lives in an HttpOnly cookie
+ * that JavaScript cannot read, so an XSS on this origin can no longer walk away
+ * with a 30-day credential. The browser attaches it automatically; every request
+ * just needs `credentials: "include"`.
+ *
+ * The price of an auto-attached cookie is CSRF, paid for with a double-submit
+ * token: the backend also sets a READABLE cookie, and we echo it back in a
+ * header. An attacking origin can make the browser send cookies but cannot read
+ * them, so it cannot produce the header.
+ *
+ * Legacy note: an older build kept the token in localStorage. Any leftover copy
+ * is cleared on load so it cannot linger as a stealable credential.
  */
-const TOKEN_KEY = "cognisense.token";
+const LEGACY_TOKEN_KEY = "cognisense.token";
+if (typeof localStorage !== "undefined") localStorage.removeItem(LEGACY_TOKEN_KEY);
 
-let authToken: string | null = localStorage.getItem(TOKEN_KEY);
+const CSRF_COOKIE = "cognisense_csrf";
 
-export function setAuthToken(token: string | null): void {
-  authToken = token;
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
-}
-
-export function getAuthToken(): string | null {
-  return authToken;
+function readCookie(name: string): string | null {
+  const match = document.cookie.match(
+    new RegExp("(?:^|; )" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "=([^;]*)"),
+  );
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
 /* Called when the server rejects our token, so the app can drop to the login
@@ -47,24 +58,31 @@ export function setUnauthorizedHandler(fn: (() => void) | null): void {
   onUnauthorized = fn;
 }
 
-function authHeaders(hasBody: boolean): Record<string, string> {
+function buildHeaders(method: string, hasBody: boolean): Record<string, string> {
   const headers: Record<string, string> = {};
   if (hasBody) headers["Content-Type"] = "application/json";
-  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+
+  // Double-submit CSRF token on state-changing methods only; safe methods are
+  // exempt on the server too.
+  if (!["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase())) {
+    const csrf = readCookie(CSRF_COOKIE);
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+  }
   return headers;
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BACKEND_URL}${path}`, {
     method,
-    headers: authHeaders(body !== undefined),
+    headers: buildHeaders(method, body !== undefined),
+    // Without this the browser omits the session cookie entirely.
+    credentials: "include",
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
   const parsed = text ? safeJson(text) : null;
   if (res.status === 401) {
-    // The token is gone, expired, or was revoked elsewhere.
-    setAuthToken(null);
+    // The session is gone, expired, or was revoked elsewhere.
     onUnauthorized?.();
   }
   if (!res.ok) throw new ApiError(res.status, parsed ?? text);
@@ -79,13 +97,13 @@ function safeJson(s: string): unknown {
 async function requestForm<T>(path: string, form: FormData): Promise<T> {
   const res = await fetch(`${BACKEND_URL}${path}`, {
     method: "POST",
-    headers: authHeaders(false),
+    headers: buildHeaders("POST", false),
+    credentials: "include",
     body: form,
   });
   const text = await res.text();
   const parsed = text ? safeJson(text) : null;
   if (res.status === 401) {
-    setAuthToken(null);
     onUnauthorized?.();
   }
   if (!res.ok) throw new ApiError(res.status, parsed ?? text);
@@ -106,6 +124,18 @@ export interface AuthResult {
   token: string;
   token_type: string;
   expires_at: string;
+}
+
+export interface RecoveryCodes {
+  codes: string[];
+  generated: number;
+  warning: string;
+}
+
+export interface RecoveryStatus {
+  codes_remaining: number;
+  codes_used: number;
+  has_codes: boolean;
 }
 
 export interface User {

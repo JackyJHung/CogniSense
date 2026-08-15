@@ -11,6 +11,8 @@ import { EveningPage } from "@/pages/EveningPage";
 import { ReportPage } from "@/pages/ReportPage";
 import { SuggestionsPage } from "@/pages/SuggestionsPage";
 import { RemindersPage } from "@/pages/RemindersPage";
+import { SecurityPage } from "@/pages/SecurityPage";
+import { RecoverPage } from "@/pages/RecoverPage";
 import type { JSX } from "react";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -54,6 +56,8 @@ function AnimatedRoutes() {
         <Route path="/report" element={<RequireAuth><PageTransition><ReportPage /></PageTransition></RequireAuth>} />
         <Route path="/suggestions" element={<RequireAuth><PageTransition><SuggestionsPage /></PageTransition></RequireAuth>} />
         <Route path="/reminders" element={<RequireAuth><PageTransition><RemindersPage /></PageTransition></RequireAuth>} />
+        <Route path="/security" element={<RequireAuth><PageTransition><SecurityPage /></PageTransition></RequireAuth>} />
+        <Route path="/recover" element={<PageTransition><RecoverPage /></PageTransition>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AnimatePresence>

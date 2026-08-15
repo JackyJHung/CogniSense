@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import {
   api,
-  setAuthToken,
   setUnauthorizedHandler,
   type MorningCheckin,
   type User,
@@ -10,8 +9,10 @@ import {
 interface AuthState {
   user: User | null;
   morning: MorningCheckin | null;
-  /** Records a successful login/signup: stores the token AND the user. */
-  signIn: (user: User, token: string) => void;
+  /** Records a successful login/signup. The session itself lives in an
+   *  HttpOnly cookie the server set on the response, so there is no token to
+   *  hold here -- only the profile, for rendering. */
+  signIn: (user: User) => void;
   setUser: (u: User | null) => void;
   setMorning: (m: MorningCheckin | null) => void;
   logout: () => void;
@@ -47,7 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearLocal = useCallback(() => {
     setUser(null);
     setMorning(null);
-    setAuthToken(null);
+    // Only cached profile data is dropped here. The session cookie is HttpOnly
+    // and can only be cleared by the server, which /users/logout does.
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
@@ -59,9 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setUnauthorizedHandler(null);
   }, [clearLocal]);
 
-  // A stored user object is not proof of a valid session -- the token may have
-  // expired or been revoked on another device. Ask the server who we are before
-  // trusting it.
+  // A cached user object is not proof of a valid session -- the cookie may have
+  // expired or been revoked on another device, and we cannot inspect it from
+  // script. Ask the server who we are before trusting it.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -80,8 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Runs once on mount; the token is read from module state inside api.ts.
   }, [clearLocal]);
 
-  const signIn = useCallback((u: User, token: string) => {
-    setAuthToken(token);
+  const signIn = useCallback((u: User) => {
     setUser(u);
   }, []);
 

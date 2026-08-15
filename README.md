@@ -239,11 +239,84 @@ row, which means it now actually works — previously it cleared localStorage an
 the credential stayed valid indefinitely. `POST /users/logout` with
 `{"all_devices": true}` revokes every session for the account.
 
-**Still worth knowing:** tokens live in `localStorage`, which is readable by any
-XSS on the origin. Moving them to an `HttpOnly` cookie would need CSRF
-protection in exchange. There is no password-change or account-recovery flow,
-and no rate limiting on login — brute-force protection is the next thing to add
-if this ever leaves localhost.
+### Where the session lives
+
+Browsers get an **HttpOnly cookie** — script cannot read it, so an XSS on the
+origin can no longer walk off with a 30-day credential. Native clients (desktop,
+mobile) keep using `Authorization: Bearer`, since they have no cookie jar.
+
+A cookie is attached automatically, which is CSRF. Three layers answer that:
+
+1. **`SameSite=Strict`** — the browser will not attach it to any cross-site
+   request at all.
+2. **Double-submit token** — a second, deliberately *readable* cookie, echoed
+   back in `X-CSRF-Token`. An attacking origin can cause the session cookie to
+   be sent but cannot read the other one, so it cannot produce the header. A
+   cross-origin HTML form cannot set custom headers at all.
+3. **Origin check** on state-changing requests.
+
+Enforced in middleware (`app/csrf.py`), not per-route, because the usual way
+CSRF protection fails is that someone adds an endpoint and forgets.
+
+Bearer-authenticated requests skip the CSRF check: a browser never attaches an
+`Authorization` header to a forged cross-site request, so they are immune by
+construction.
+
+**Why `/api` is proxied.** A `SameSite=Strict` cookie set by `127.0.0.1:8000` is
+never sent to a page on `localhost:5173` — different sites. Weakening it to
+`SameSite=None` would re-open the exact hole the cookie exists to close. Instead
+Vite proxies `/api` to the backend in development, and the backend serves
+`web_app/dist` itself in production, so the browser sees one origin either way.
+Relatedly, the old CORS config (`allow_origins=["*"]` with
+`allow_credentials=True`) was not merely loose — browsers refuse to send cookies
+to a wildcard origin, so it would have broken cookie auth outright.
+
+### Brute-force protection
+
+Login, signup, password change and recovery are throttled per-username and
+per-IP: 5 failures per user or 20 per address in a 15-minute window, then a
+lockout that escalates 1m → 2m → 4m, capped at an hour.
+
+The check runs **before** any password hashing. bcrypt costs ~250ms of pinned
+CPU, so a limit applied after verification would leave the endpoint a
+denial-of-service amplifier — a handful of attackers sending junk could
+saturate the processor without guessing anything. The timing-equaliser hash
+(which stops username enumeration by response time) makes that worse, not
+better, since junk requests then pay the bcrypt cost too. Ordering is the whole
+defence, and `test_throttle_refuses_before_any_password_hashing` asserts it.
+
+Each surface has its **own** throttle namespace. Sharing them would mean that
+someone who forgot their password, failed login a few times, and reached for
+account recovery would find recovery locked as well — the one route back into
+the account barred at exactly the moment it was needed, by their own honest
+attempts.
+
+Tuning: `COGNISENSE_*` variables are read at import; see `app/ratelimit.py`.
+
+### Password change and account recovery
+
+`POST /users/password` takes the current and new password, then revokes **every**
+session and issues one fresh one. That is the point of changing a password after
+a suspected compromise: whoever holds a stolen token must lose it.
+
+Recovery uses **single-use codes**, not an email reset link, because the project
+has no mail server and the User model holds no email address. A reset endpoint
+that pretended to send mail would look like a working recovery path right up to
+the moment somebody needed it. Ten codes are issued at once, shown once, and
+stored only as hashes — CogniSense cannot tell a user what their codes were,
+only issue new ones. Generating a new set cancels every unused old one, and a
+successful reset revokes all sessions.
+
+Codes avoid `0/O/1/I/L` and ignore case and dashes on entry: they get copied off
+a screen by hand, often by somebody already worried about their memory.
+
+**Still worth knowing.** There is no email address on file, so a user who loses
+both their password and their codes cannot be recovered. Sessions are 30 days
+with no idle timeout. `X-Forwarded-For` is trusted when present, so behind a
+proxy that header must be set by the proxy and stripped from inbound requests,
+or the per-IP limit can be sidestepped (the per-user limit is unaffected).
+Set `COGNISENSE_COOKIE_SECURE=1` and `COGNISENSE_ALLOWED_ORIGINS` in any real
+deployment.
 
 ## Notifications (`/push`)
 

@@ -112,7 +112,9 @@ def test_full_daily_flow(client):
     # Signup
     payload = {
         "username": "flow_user",
-        "password": "abcdef",
+        # 8 characters minimum since the password-change and recovery flows
+        # landed; "abcdef" no longer passes validation.
+        "password": "abcdefgh",
         "age": 72,
         "gender": "male",
         "race": "hispanic",
