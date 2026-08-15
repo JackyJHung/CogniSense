@@ -108,6 +108,30 @@ PUSH_COOLDOWN_HOURS = _int("COGNISENSE_PUSH_COOLDOWN_HOURS", 6)
 DISABLE_SCHEDULER = _flag("COGNISENSE_DISABLE_SCHEDULER")
 
 # --------------------------------------------------------------------------
+# Email
+# --------------------------------------------------------------------------
+
+# Absolute base URL the app is reached at, used to build links inside emails.
+# A reset link is useless if it points at localhost, so production requires it.
+PUBLIC_URL = os.environ.get("COGNISENSE_PUBLIC_URL", "http://localhost:5173").rstrip("/")
+
+SMTP_HOST = os.environ.get("COGNISENSE_SMTP_HOST", "").strip()
+SMTP_PORT = _int("COGNISENSE_SMTP_PORT", 587)
+SMTP_USER = os.environ.get("COGNISENSE_SMTP_USER", "").strip()
+SMTP_PASSWORD = os.environ.get("COGNISENSE_SMTP_PASSWORD", "")
+SMTP_STARTTLS = _flag("COGNISENSE_SMTP_STARTTLS", default=True)
+SMTP_FROM = os.environ.get("COGNISENSE_SMTP_FROM", "CogniSense <no-reply@cognisense.local>")
+
+# With no SMTP host configured, emails are written to the log instead of sent.
+# That keeps the whole flow runnable and testable offline, and is obvious in the
+# output rather than silently doing nothing.
+EMAIL_ENABLED = bool(SMTP_HOST)
+
+# How long a link in an email stays usable.
+RESET_TOKEN_MINUTES = _int("COGNISENSE_RESET_TOKEN_MINUTES", 60)
+VERIFY_TOKEN_HOURS = _int("COGNISENSE_VERIFY_TOKEN_HOURS", 24)
+
+# --------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------
 
@@ -159,6 +183,19 @@ def problems() -> list[str]:
             "want a real contact address for the application server."
         )
 
+    if "localhost" in PUBLIC_URL or PUBLIC_URL.startswith("http://"):
+        found.append(
+            f"COGNISENSE_PUBLIC_URL is {PUBLIC_URL!r}. Links inside password-reset "
+            "emails are built from it, so a localhost or plain-http value sends "
+            "users a link that does not work."
+        )
+
+    if EMAIL_ENABLED and SMTP_FROM.endswith("@cognisense.local>"):
+        found.append(
+            "COGNISENSE_SMTP_FROM is still the placeholder domain. Mail from an "
+            "undeliverable sender is rejected or spam-filed by most providers."
+        )
+
     return found
 
 
@@ -194,4 +231,7 @@ def summary() -> dict:
         "session_ttl_days": SESSION_TTL_DAYS,
         "session_idle_days": SESSION_IDLE_DAYS,
         "scheduler": "disabled" if DISABLE_SCHEDULER else "enabled",
+        "public_url": PUBLIC_URL,
+        "email": f"smtp {SMTP_HOST}:{SMTP_PORT}" if EMAIL_ENABLED
+                 else "NOT SENDING (no SMTP host; emails go to the log)",
     }

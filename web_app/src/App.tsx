@@ -13,6 +13,7 @@ import { SuggestionsPage } from "@/pages/SuggestionsPage";
 import { RemindersPage } from "@/pages/RemindersPage";
 import { SecurityPage } from "@/pages/SecurityPage";
 import { RecoverPage } from "@/pages/RecoverPage";
+import { ResetPasswordPage, VerifyEmailPage } from "@/pages/TokenLandingPages";
 import type { JSX } from "react";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -58,6 +59,10 @@ function AnimatedRoutes() {
         <Route path="/reminders" element={<RequireAuth><PageTransition><RemindersPage /></PageTransition></RequireAuth>} />
         <Route path="/security" element={<RequireAuth><PageTransition><SecurityPage /></PageTransition></RequireAuth>} />
         <Route path="/recover" element={<PageTransition><RecoverPage /></PageTransition>} />
+        {/* Reached from an email link; the token in the URL is the credential,
+            so these must NOT sit behind RequireAuth. */}
+        <Route path="/verify-email" element={<PageTransition><VerifyEmailPage /></PageTransition>} />
+        <Route path="/reset-password" element={<PageTransition><ResetPasswordPage /></PageTransition>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AnimatePresence>

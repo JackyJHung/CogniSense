@@ -35,23 +35,36 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
+from app import config
 from app.auth import get_current_user, revoke_all_sessions
 from app.database import get_db
-from app.models.security import RecoveryCode
+from app.emailer import send_password_reset, send_verification
+from app.models.security import EmailToken, RecoveryCode
 from app.models.user import User
 from app.ratelimit import check_or_raise, clear, keys_for, register_failure
-from app.schemas import RecoverRequest, RecoveryCodesOut, RecoveryStatusOut, AuthOut
+from app.schemas import (
+    AuthOut,
+    EmailTokenRequest,
+    ForgotPasswordRequest,
+    GenericMessageOut,
+    RecoverRequest,
+    RecoveryCodesOut,
+    RecoveryStatusOut,
+    ResetWithTokenRequest,
+    SetEmailRequest,
+)
+# users.py does not import this module, so there is no cycle -- these can be
+# ordinary module-level imports, and password hashing stays defined in exactly
+# one place rather than being configured twice with two chances to diverge.
+from app.routes.users import _password_matches, issue_session, pwd_context
 
 router = APIRouter(prefix="/recovery", tags=["recovery"])
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 CODE_COUNT = 10
 # 4 groups of 5 chars from a 32-symbol alphabet ~= 100 bits. Far beyond guessing,
@@ -86,6 +99,210 @@ def _generate_code() -> str:
     ]
     return "-".join(groups)
 
+
+# ==========================================================================
+# Email-delivered tokens
+# ==========================================================================
+
+def _issue_token(db: Session, user: User, purpose: str, ttl: timedelta) -> str:
+    """Mint a single-use token, invalidating any outstanding one of the same kind.
+
+    Superseding the previous token matters: a user who clicks "email me a link"
+    three times should end up with one live link, not three, and the two they
+    abandoned should stop working immediately.
+    """
+    db.query(EmailToken).filter(
+        EmailToken.user_id == user.id,
+        EmailToken.purpose == purpose,
+        EmailToken.used_at.is_(None),
+    ).delete(synchronize_session=False)
+
+    raw = secrets.token_urlsafe(32)
+    db.add(EmailToken(
+        user_id=user.id,
+        token_hash=_hash_code(raw),
+        purpose=purpose,
+        email=user.email or "",
+        expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + ttl,
+    ))
+    db.commit()
+    return raw
+
+
+def _consume_token(db: Session, raw: str, purpose: str) -> User | None:
+    """Validate and burn a token. None for anything wrong, without saying which."""
+    row = (
+        db.query(EmailToken)
+        .filter(EmailToken.token_hash == _hash_code(raw))
+        .filter(EmailToken.purpose == purpose)
+        .filter(EmailToken.used_at.is_(None))
+        .first()
+    )
+    if row is None:
+        return None
+
+    now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+    if row.expires_at <= now_naive:
+        db.delete(row)
+        db.commit()
+        return None
+
+    user = db.query(User).filter(User.id == row.user_id).first()
+    if user is None:
+        return None
+
+    # The address must still be the one the token was issued for. Otherwise a
+    # link mailed to an old address stays live after the user moves away from
+    # it -- which is exactly what someone does after losing control of an inbox.
+    if (row.email or "") != (user.email or ""):
+        db.delete(row)
+        db.commit()
+        return None
+
+    row.used_at = datetime.now(timezone.utc)
+    db.commit()
+    return user
+
+
+@router.post("/email", response_model=GenericMessageOut)
+def set_email(
+    payload: SetEmailRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Attach a recovery address and send a confirmation link.
+
+    Requires the password: a borrowed session must not be able to point recovery
+    at somebody else's inbox, which would convert temporary access into
+    permanent ownership of the account.
+    """
+    keys = keys_for(current_user.username, request, scope="setemail")
+    check_or_raise(db, keys)
+
+    if not _password_matches(payload.current_password, current_user.hashed_password):
+        register_failure(db, keys)
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    address = payload.email.strip().lower()
+
+    taken = (
+        db.query(User)
+        .filter(User.email == address)
+        .filter(User.id != current_user.id)
+        .first()
+    )
+    if taken is not None:
+        # Generic on purpose: confirming which addresses are registered would
+        # leak the membership of a cognitive-health app.
+        raise HTTPException(
+            status_code=409,
+            detail="That address cannot be used for this account.",
+        )
+
+    current_user.email = address
+    current_user.email_verified_at = None   # re-verify on every change
+    db.commit()
+    clear(db, keys)
+
+    token = _issue_token(
+        db, current_user, EmailToken.PURPOSE_VERIFY,
+        timedelta(hours=config.VERIFY_TOKEN_HOURS),
+    )
+    send_verification(address, current_user.username, token)
+
+    return GenericMessageOut(message=(
+        f"Check {address} for a link to confirm the address. "
+        f"It expires in {config.VERIFY_TOKEN_HOURS} hours."
+    ))
+
+
+@router.post("/email/verify", response_model=GenericMessageOut)
+def verify_email(payload: EmailTokenRequest, db: Session = Depends(get_db)):
+    """Confirm an address. The link itself is the proof, so no session needed."""
+    user = _consume_token(db, payload.token, EmailToken.PURPOSE_VERIFY)
+    if user is None:
+        raise HTTPException(
+            status_code=400,
+            detail="That confirmation link is invalid or has expired. "
+                   "Request a new one from Password & recovery.",
+        )
+    user.email_verified_at = datetime.now(timezone.utc)
+    db.commit()
+    return GenericMessageOut(message="Email confirmed. It can now be used to reset your password.")
+
+
+@router.post("/forgot", response_model=GenericMessageOut)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Email a reset link, if the account exists and has a verified address.
+
+    ALWAYS returns the same message. Whether the account exists, whether it has
+    an email, whether that email is verified -- none of it is observable. On a
+    cognitive-health app, confirming that a given address has an account is
+    itself a disclosure worth avoiding.
+    """
+    keys = keys_for(payload.identifier, request, scope="forgot")
+    check_or_raise(db, keys)
+
+    identifier = payload.identifier.strip().lower()
+    user = (
+        db.query(User)
+        .filter((User.username == payload.identifier.strip()) | (User.email == identifier))
+        .first()
+    )
+
+    if user is not None and user.email_is_verified:
+        token = _issue_token(
+            db, user, EmailToken.PURPOSE_RESET,
+            timedelta(minutes=config.RESET_TOKEN_MINUTES),
+        )
+        send_password_reset(user.email, user.username, token)
+    else:
+        # Count it: otherwise this endpoint is a free, unlimited probe for which
+        # usernames and addresses exist.
+        register_failure(db, keys)
+
+    return GenericMessageOut(message=(
+        "If that account exists and has a confirmed email address, a reset link "
+        "is on its way. Check your inbox, and your spam folder."
+    ))
+
+
+@router.post("/reset-token", response_model=AuthOut)
+def reset_with_token(
+    payload: ResetWithTokenRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    user_agent: Optional[str] = Header(default=None),
+):
+    """Set a new password from an emailed link."""
+    keys = keys_for(None, request, scope="resettoken")
+    check_or_raise(db, keys)
+
+    user = _consume_token(db, payload.token, EmailToken.PURPOSE_RESET)
+    if user is None:
+        register_failure(db, keys)
+        raise HTTPException(
+            status_code=400,
+            detail="That reset link is invalid or has expired. Request a new one.",
+        )
+
+    user.hashed_password = pwd_context.hash(payload.new_password)
+    db.commit()
+    revoke_all_sessions(db, user.id)
+    clear(db, keys)
+
+    return issue_session(db, user, user_agent, response)
+
+
+# ==========================================================================
+# Offline recovery codes
+# ==========================================================================
 
 @router.post("/codes", response_model=RecoveryCodesOut)
 def generate_codes(
@@ -122,6 +339,11 @@ def status(
         codes_remaining=remaining,
         codes_used=sum(1 for r in rows if r.used_at is not None),
         has_codes=bool(rows),
+        email=current_user.email,
+        email_verified=current_user.email_is_verified,
+        # Surfaced so the UI can say "this server is not sending mail" rather
+        # than telling somebody to check an inbox that will stay empty.
+        email_delivery_enabled=config.EMAIL_ENABLED,
     )
 
 
@@ -166,9 +388,5 @@ def reset_with_code(
     # recovering an account you believe someone else has reached.
     revoke_all_sessions(db, user.id)
     clear(db, keys)
-
-    # Imported here to avoid a circular import at module load: users.py imports
-    # from app.auth, and this module is imported by main.py alongside it.
-    from app.routes.users import issue_session
 
     return issue_session(db, user, user_agent, response)

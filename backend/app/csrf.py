@@ -59,7 +59,13 @@ SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 CSRF_EXEMPT_PATHS = {
     "/users/login",
     "/users/signup",
+    # Reached from an email link or a code, before any session exists, so there
+    # is no CSRF token to present. Each is throttled and consumes a single-use
+    # secret, which is what protects them instead.
     "/recovery/reset",
+    "/recovery/forgot",
+    "/recovery/reset-token",
+    "/recovery/email/verify",
     "/health",
 }
 

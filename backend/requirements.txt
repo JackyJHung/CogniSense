@@ -11,6 +11,11 @@ python-multipart==0.0.12
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1  # passlib 1.7.4 is incompatible with bcrypt>=4.1
 pywebpush==2.0.0  # Web Push delivery for reminder notifications
+email-validator==2.2.0  # backs pydantic's EmailStr
+
+# NOTE: sending mail needs no extra package - app/emailer.py uses stdlib
+# smtplib. With no SMTP host configured it logs the message instead of sending,
+# so the whole recovery flow stays runnable offline.
 
 # REMOVED: python-jose[cryptography]==3.3.0
 # It was never imported anywhere. Sessions use opaque random tokens hashed in

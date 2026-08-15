@@ -1,6 +1,6 @@
 """User ORM model: demographics + wake/sleep times for check-in scheduling."""
 
-from sqlalchemy import Column, Integer, String, Time, DateTime, Float
+from sqlalchemy import Column, DateTime, Float, Integer, String, Time
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -29,6 +29,16 @@ class User(Base):
     # they'd already submitted. Repeated checking is a soft anxiety/compulsion
     # marker, surfaced in the risk report as a small additive modifier.
     morning_revisit_count = Column(Integer, default=0, nullable=False)
+
+    # Optional, and only usable for account recovery once verified. An
+    # unverified address is worse than none: a typo at signup would send reset
+    # links to a stranger's inbox, turning recovery into account takeover.
+    email = Column(String(320), nullable=True, index=True)
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def email_is_verified(self) -> bool:
+        return bool(self.email and self.email_verified_at)
 
     # Minutes to ADD to UTC to reach this user's local time, so UTC-7 is -420.
     # The browser reports it when subscribing to notifications. Without it the

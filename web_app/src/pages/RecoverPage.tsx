@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Disclaimer } from "@/components/Disclaimer";
-import { api, type AuthResult } from "@/lib/api";
+import { api, type AuthResult, type GenericMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 export function RecoverPage() {
@@ -18,6 +18,10 @@ export function RecoverPage() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [linkIdentifier, setLinkIdentifier] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkNote, setLinkNote] = useState<string | null>(null);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -44,8 +48,58 @@ export function RecoverPage() {
     }
   };
 
+  const emailReset = async (e: FormEvent) => {
+    e.preventDefault();
+    setLinkBusy(true);
+    setLinkNote(null);
+    try {
+      const r = await api.post<GenericMessage>("/recovery/forgot", {
+        identifier: linkIdentifier,
+      });
+      setLinkNote(r.message);
+    } catch (err) {
+      setLinkNote(
+        err instanceof Error ? err.message : "Could not send a reset link right now.",
+      );
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
   return (
     <CenteredShell>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Email me a reset link</CardTitle>
+          <CardDescription>
+            If you added an email address and confirmed it, we can send you a
+            link instead.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={emailReset} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="identifier">Username or email</Label>
+              <Input
+                id="identifier"
+                autoComplete="username"
+                value={linkIdentifier}
+                onChange={(e) => setLinkIdentifier(e.target.value)}
+                required
+              />
+            </div>
+            {linkNote && (
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                {linkNote}
+              </p>
+            )}
+            <Button type="submit" variant="secondary" loading={linkBusy}>
+              Send a reset link
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Use a recovery code</CardTitle>
@@ -119,10 +173,9 @@ export function RecoverPage() {
             </Link>
           </p>
           <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-            No codes saved? CogniSense holds no email address, so there is no
-            reset link it could send. Without a code the account cannot be
-            recovered — sign up again, and generate codes from Password &amp;
-            recovery straight away.
+            No codes and no confirmed email? Then the account cannot be
+            recovered — there is nothing left that proves it is yours. Sign up
+            again, and add a recovery email or generate codes straight away.
           </p>
         </CardContent>
       </Card>

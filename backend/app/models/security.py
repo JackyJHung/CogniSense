@@ -42,6 +42,41 @@ class LoginAttempt(Base):
     lockout_count = Column(Integer, nullable=False, default=0)
 
 
+class EmailToken(Base):
+    """A single-use token delivered by email: verify an address, or reset a password.
+
+    One table for both purposes because the machinery is identical -- random
+    token, stored as a hash, short expiry, consumed on use -- and `purpose`
+    keeps them from being interchangeable. A verification link must not be
+    redeemable as a password reset.
+
+    Hashed like everything else here: an attacker reading the database must not
+    come away with live reset links.
+    """
+
+    __tablename__ = "email_tokens"
+
+    PURPOSE_VERIFY = "verify"
+    PURPOSE_RESET = "reset"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    token_hash = Column(String(64), nullable=False, index=True)
+    purpose = Column(String(20), nullable=False, index=True)
+
+    # The address the token was issued for. A reset token is refused if the
+    # account's email has changed since -- otherwise a link mailed to an old
+    # address stays live after the user moves away from it.
+    email = Column(String(320), nullable=False)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User", backref="email_tokens")
+
+
 class RecoveryCode(Base):
     """One single-use account-recovery code.
 

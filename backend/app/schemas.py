@@ -2,7 +2,7 @@
 
 from datetime import datetime, time
 from typing import Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 Gender = Literal["female", "male", "nonbinary", "other", "prefer_not"]
@@ -35,6 +35,8 @@ class UserOut(BaseModel):
     wake_time: time
     sleep_time: time
     created_at: datetime
+    email: Optional[str] = None
+    email_verified_at: Optional[datetime] = None
 
 
 class LoginRequest(BaseModel):
@@ -88,6 +90,37 @@ class RecoveryStatusOut(BaseModel):
     codes_remaining: int
     codes_used: int
     has_codes: bool
+    email: Optional[str] = None
+    email_verified: bool = False
+    email_delivery_enabled: bool = False
+
+
+class SetEmailRequest(BaseModel):
+    # Changing the recovery address is a credential operation, so it needs the
+    # password: otherwise a borrowed session could redirect recovery to an
+    # attacker's inbox and take the account permanently.
+    current_password: str
+    email: EmailStr
+
+
+class EmailTokenRequest(BaseModel):
+    token: str = Field(..., max_length=200)
+
+
+class ForgotPasswordRequest(BaseModel):
+    # Username or email; one field so the form does not force a choice.
+    identifier: str = Field(..., max_length=320)
+
+
+class ResetWithTokenRequest(BaseModel):
+    token: str = Field(..., max_length=200)
+    new_password: str = Field(..., min_length=MIN_PASSWORD_LENGTH, max_length=200)
+
+
+class GenericMessageOut(BaseModel):
+    """Deliberately says the same thing whether or not the account exists."""
+    ok: bool = True
+    message: str
 
 
 # ---------- Morning check-in ----------

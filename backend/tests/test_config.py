@@ -159,9 +159,45 @@ def test_a_correct_production_config_passes(monkeypatch):
         COGNISENSE_COOKIE_SECURE="1",
         COGNISENSE_ALLOWED_ORIGINS="https://cognisense.example",
         COGNISENSE_VAPID_SUBJECT="mailto:ops@example.com",
+        COGNISENSE_PUBLIC_URL="https://cognisense.example",
     )
     assert cfg.problems() == []
     cfg.validate()
+
+
+def test_production_rejects_a_localhost_public_url(monkeypatch):
+    """Reset links are built from PUBLIC_URL, so localhost mails a dead link."""
+    cfg = _reloaded(
+        monkeypatch,
+        COGNISENSE_ENV="production",
+        COGNISENSE_COOKIE_SECURE="1",
+        COGNISENSE_ALLOWED_ORIGINS="https://cognisense.example",
+        COGNISENSE_VAPID_SUBJECT="mailto:ops@example.com",
+        COGNISENSE_PUBLIC_URL="http://localhost:5173",
+    )
+    assert any("PUBLIC_URL" in p for p in cfg.problems())
+
+
+def test_production_rejects_a_placeholder_mail_sender(monkeypatch):
+    """Mail from an undeliverable domain is rejected or spam-filed."""
+    cfg = _reloaded(
+        monkeypatch,
+        COGNISENSE_ENV="production",
+        COGNISENSE_COOKIE_SECURE="1",
+        COGNISENSE_ALLOWED_ORIGINS="https://cognisense.example",
+        COGNISENSE_VAPID_SUBJECT="mailto:ops@example.com",
+        COGNISENSE_PUBLIC_URL="https://cognisense.example",
+        COGNISENSE_SMTP_HOST="smtp.example.com",
+    )
+    assert any("SMTP_FROM" in p for p in cfg.problems())
+
+
+def test_email_is_disabled_without_an_smtp_host(monkeypatch):
+    """No host means messages go to the log, and the summary must say so."""
+    monkeypatch.delenv("COGNISENSE_SMTP_HOST", raising=False)
+    cfg = _reloaded(monkeypatch, COGNISENSE_ENV="development")
+    assert cfg.EMAIL_ENABLED is False
+    assert "NOT SENDING" in cfg.summary()["email"]
 
 
 def test_production_defaults_cookie_secure_on(monkeypatch):

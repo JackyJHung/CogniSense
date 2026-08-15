@@ -299,20 +299,44 @@ Tuning: `COGNISENSE_*` variables are read at import; see `app/ratelimit.py`.
 session and issues one fresh one. That is the point of changing a password after
 a suspected compromise: whoever holds a stolen token must lose it.
 
-Recovery uses **single-use codes**, not an email reset link, because the project
-has no mail server and the User model holds no email address. A reset endpoint
-that pretended to send mail would look like a working recovery path right up to
-the moment somebody needed it. Ten codes are issued at once, shown once, and
-stored only as hashes — CogniSense cannot tell a user what their codes were,
-only issue new ones. Generating a new set cancels every unused old one, and a
-successful reset revokes all sessions.
+There are **two** recovery routes, and a user can have either or both.
 
-Codes avoid `0/O/1/I/L` and ignore case and dashes on entry: they get copied off
-a screen by hand, often by somebody already worried about their memory.
+**Recovery codes** work with no infrastructure at all. Ten single-use codes are
+issued at once, shown once, and stored only as hashes — CogniSense cannot tell a
+user what their codes were, only issue new ones. Generating a new set cancels
+every unused old one. Codes avoid `0/O/1/I/L` and ignore case and dashes on
+entry: they get copied off a screen by hand, often by somebody already worried
+about their memory.
 
-**Still worth knowing.** There is no email address on file, so a user who loses
-both their password and their codes cannot be recovered — that is inherent to
-having no mail server, and the UI says so rather than implying otherwise.
+**Email reset links** work when SMTP is configured. The address must be
+**confirmed first**, and that is the point rather than a formality: an
+unverified address is worse than none, because a typo at signup would send reset
+links to a stranger's inbox and turn recovery into account takeover. So an
+address is unusable for reset until a confirmation link is clicked, and changing
+the address drops verification again.
+
+Adding or changing the address requires the current password — otherwise a
+borrowed unlocked device could point recovery at someone else's inbox and
+convert temporary access into permanent ownership.
+
+`POST /recovery/forgot` always returns the same message, whether the account
+exists, has an email, or has confirmed it. On a cognitive-health app,
+confirming that a given address has an account is itself a disclosure. It is
+throttled too, or it would be a free unlimited probe for which accounts exist.
+
+Reset links expire in 60 minutes, work once, are superseded when a new one is
+requested, and die if the account's address changes afterwards — a link mailed
+to an inbox somebody has since lost control of must not stay live. A successful
+reset by either route revokes every session.
+
+**With no SMTP configured the flow still runs**: `app/emailer.py` writes each
+message, link included, to the server log instead of sending, and the UI says
+"this server has no mail configured" rather than telling someone to check an
+inbox that will stay empty.
+
+**Still worth knowing.** A user who loses their password, their codes, *and*
+access to their confirmed email cannot be recovered — at that point nothing is
+left that proves the account is theirs.
 
 ## Configuration and deployment
 
@@ -354,6 +378,9 @@ config session_idle_days  7
 | `COGNISENSE_SESSION_TTL_DAYS` | `30` | absolute session lifetime |
 | `COGNISENSE_SESSION_IDLE_DAYS` | `7` | idle expiry, for lost devices |
 | `COGNISENSE_VAPID_SUBJECT` | placeholder | rejected in production |
+| `COGNISENSE_PUBLIC_URL` | `http://localhost:5173` | links in emails are built from it |
+| `COGNISENSE_SMTP_HOST` | *(empty)* | empty = log emails instead of sending |
+| `COGNISENSE_SMTP_FROM` | placeholder | must be deliverable or mail is spam-filed |
 | `COGNISENSE_LOG_LEVEL` | `INFO` | `DEBUG` traces scheduler decisions |
 
 **`X-Forwarded-For` is ignored unless a trusted proxy is configured.** It used

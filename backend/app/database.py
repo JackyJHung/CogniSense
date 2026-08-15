@@ -68,3 +68,20 @@ def _run_lightweight_migrations():
     if "last_push_at" not in user_cols:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE users ADD COLUMN last_push_at DATETIME"))
+
+    # users.email / email_verified_at -- added with email-based recovery.
+    if "email" not in user_cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN email VARCHAR(320)"))
+    if "email_verified_at" not in user_cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN email_verified_at DATETIME"))
+
+    # One account per address, so "reset the account for this email" is never
+    # ambiguous. A partial index lets any number of rows keep email NULL --
+    # a plain UNIQUE would collide on the second null in some backends.
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email "
+            "ON users(email) WHERE email IS NOT NULL"
+        ))

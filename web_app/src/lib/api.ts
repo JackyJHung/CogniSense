@@ -136,6 +136,16 @@ export interface RecoveryStatus {
   codes_remaining: number;
   codes_used: number;
   has_codes: boolean;
+  email: string | null;
+  email_verified: boolean;
+  /** False when the server has no SMTP configured — never tell the user to
+   *  check an inbox that will stay empty. */
+  email_delivery_enabled: boolean;
+}
+
+export interface GenericMessage {
+  ok: boolean;
+  message: string;
 }
 
 export interface User {
