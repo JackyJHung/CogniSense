@@ -1,7 +1,6 @@
 """FastAPI entry point for CogniSense backend."""
 
 import logging
-import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -9,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app import config
 from app.csrf import CsrfMiddleware, allowed_origins
 from app.database import init_db
 from app.notifications import scheduler
@@ -22,9 +22,11 @@ from app.data.research_benchmarks import NON_DIAGNOSTIC_DISCLAIMER
 # without this there is no way to tell whether it is alive, sending, or quietly
 # erroring. Override with COGNISENSE_LOG_LEVEL=DEBUG when diagnosing.
 logging.basicConfig(
-    level=os.environ.get("COGNISENSE_LOG_LEVEL", "INFO").upper(),
+    level=config.LOG_LEVEL,
     format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
 )
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="CogniSense API",
@@ -57,6 +59,14 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def on_startup():
+    # Before anything else. In production this RAISES on an unsafe security
+    # configuration rather than serving; in development it logs the same list,
+    # so problems are visible long before a deploy. A warning that merely
+    # scrolls past in a log is not a safeguard.
+    config.validate()
+    for key, value in config.summary().items():
+        logger.info("config %-18s %s", key, value)
+
     init_db()
     # The reminder push loop. Without this running, notifications only ever
     # appear while somebody has the app open -- which defeats the point.

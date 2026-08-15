@@ -40,12 +40,13 @@ to CSRF by construction and are skipped by this middleware.
 """
 from __future__ import annotations
 
-import os
 import secrets
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+
+from app import config
 
 SESSION_COOKIE = "cognisense_session"
 CSRF_COOKIE = "cognisense_csrf"
@@ -62,24 +63,19 @@ CSRF_EXEMPT_PATHS = {
     "/health",
 }
 
-COOKIE_MAX_AGE = 30 * 24 * 60 * 60  # matches SESSION_TTL_DAYS
+COOKIE_MAX_AGE = config.SESSION_TTL_DAYS * 24 * 60 * 60
 
 
 def cookies_secure() -> bool:
-    """Set COGNISENSE_COOKIE_SECURE=1 in any deployment served over HTTPS.
+    """Defaults on in production, off in development (Secure dies over http).
 
-    Left off by default because a Secure cookie is dropped over plain http, and
-    the documented dev setup is http://localhost.
+    app.config.validate() refuses to start a production server with this off.
     """
-    return os.environ.get("COGNISENSE_COOKIE_SECURE", "").strip() in {"1", "true", "yes"}
+    return config.COOKIE_SECURE
 
 
 def allowed_origins() -> set[str]:
-    raw = os.environ.get(
-        "COGNISENSE_ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000",
-    )
-    return {o.strip().rstrip("/") for o in raw.split(",") if o.strip()}
+    return config.ALLOWED_ORIGINS
 
 
 def new_csrf_token() -> str:

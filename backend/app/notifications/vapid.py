@@ -26,14 +26,17 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
+from app import config
+
 logger = logging.getLogger(__name__)
 
 KEY_DIR = Path(__file__).resolve().parents[1] / "db"
 PRIVATE_KEY_PATH = KEY_DIR / "vapid_private.pem"
 
 # The `sub` claim in the VAPID JWT. Push services want a way to contact whoever
-# is responsible for a misbehaving application server. Override in deployment.
-VAPID_SUBJECT = os.environ.get("COGNISENSE_VAPID_SUBJECT", "mailto:admin@cognisense.local")
+# is responsible for a misbehaving application server. config.validate() refuses
+# to start a production server that has left this as the placeholder.
+VAPID_SUBJECT = config.VAPID_SUBJECT
 
 
 def _b64url(raw: bytes) -> str:

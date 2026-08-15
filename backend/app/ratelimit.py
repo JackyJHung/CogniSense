@@ -38,6 +38,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app import config
 from app.models.security import LoginAttempt
 
 logger = logging.getLogger(__name__)
@@ -71,19 +72,35 @@ class ThrottleDecision:
 
 
 def client_ip(request: Request | None) -> str:
-    """Best-effort caller address.
+    """The caller's address, believing X-Forwarded-For only from a trusted peer.
 
-    Trusts X-Forwarded-For only if it is present, and takes the FIRST entry --
-    the original client. Behind a reverse proxy this must be a header the proxy
-    sets and strips from inbound requests; otherwise a caller can spoof it and
-    sidestep the per-IP limit. The per-user limit does not depend on this.
+    THE BUG THIS FIXES. This used to trust X-Forwarded-For whenever the header
+    was present. Since any client can set an arbitrary header, an attacker had
+    only to send a different `X-Forwarded-For` value on each request to get a
+    fresh per-IP budget every time -- which defeats the per-IP limit completely,
+    silently, and precisely when it matters. The per-user limit still applied,
+    but the address limit (the one that stops a single host spraying one guess
+    across many accounts) was decorative.
+
+    Now the header is read only when the DIRECT peer is a configured trusted
+    proxy. With no proxies configured -- the default -- the socket address is
+    always used and the header is ignored entirely.
+
+    Note the proxy must also strip inbound X-Forwarded-For, otherwise a client
+    can prepend a forged entry that the proxy then appends to.
     """
     if request is None:
         return "unknown"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()[:100]
-    return (request.client.host if request.client else "unknown")[:100]
+
+    peer = (request.client.host if request.client else "unknown")
+
+    if peer in config.TRUSTED_PROXIES:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            # Leftmost entry is the original client, as appended by each hop.
+            return forwarded.split(",")[0].strip()[:100]
+
+    return peer[:100]
 
 
 def keys_for(

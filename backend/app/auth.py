@@ -33,14 +33,21 @@ from typing import Optional, TypeVar
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app import config
 from app.csrf import SESSION_COOKIE
 from app.database import get_db
 from app.models.session import UserSession
 from app.models.user import User
 
-# 30 days. Long enough that a daily-check-in app does not nag for a password,
-# short enough that an abandoned device stops working within a month.
-SESSION_TTL_DAYS = 30
+# Absolute lifetime: long enough that a daily-check-in app does not nag for a
+# password, short enough that an abandoned device stops working within a month.
+SESSION_TTL_DAYS = config.SESSION_TTL_DAYS
+
+# Idle lifetime. Absolute expiry alone is not enough: a session created 29 days
+# ago and untouched for 28 of them is still valid, which is exactly the session
+# sitting on a lost laptop. `last_used_at` was already recorded on every
+# request; this is what finally reads it.
+SESSION_IDLE_DAYS = config.SESSION_IDLE_DAYS
 
 # 32 bytes -> 43 url-safe characters. Far beyond guessing.
 TOKEN_BYTES = 32
@@ -131,10 +138,21 @@ def get_current_user(
     if session is None:
         raise UNAUTHENTICATED
 
-    expires = session.expires_at
-    if expires is not None and expires.tzinfo is None:
-        expires = expires.replace(tzinfo=timezone.utc)
-    if expires is not None and expires <= datetime.now(timezone.utc):
+    now = datetime.now(timezone.utc)
+
+    def _aware(value):
+        return value.replace(tzinfo=timezone.utc) if value and value.tzinfo is None else value
+
+    expires = _aware(session.expires_at)
+    if expires is not None and expires <= now:
+        db.delete(session)
+        db.commit()
+        raise UNAUTHENTICATED
+
+    # Idle expiry. Falls back to created_at for a session that has never been
+    # used, so a token issued and then abandoned still ages out.
+    last_seen = _aware(session.last_used_at) or _aware(session.created_at)
+    if last_seen is not None and now - last_seen > timedelta(days=SESSION_IDLE_DAYS):
         db.delete(session)
         db.commit()
         raise UNAUTHENTICATED
@@ -146,7 +164,7 @@ def get_current_user(
         db.commit()
         raise UNAUTHENTICATED
 
-    session.last_used_at = datetime.now(timezone.utc)
+    session.last_used_at = now
     db.commit()
     return user
 

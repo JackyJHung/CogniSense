@@ -311,12 +311,63 @@ Codes avoid `0/O/1/I/L` and ignore case and dashes on entry: they get copied off
 a screen by hand, often by somebody already worried about their memory.
 
 **Still worth knowing.** There is no email address on file, so a user who loses
-both their password and their codes cannot be recovered. Sessions are 30 days
-with no idle timeout. `X-Forwarded-For` is trusted when present, so behind a
-proxy that header must be set by the proxy and stripped from inbound requests,
-or the per-IP limit can be sidestepped (the per-user limit is unaffected).
-Set `COGNISENSE_COOKIE_SECURE=1` and `COGNISENSE_ALLOWED_ORIGINS` in any real
-deployment.
+both their password and their codes cannot be recovered — that is inherent to
+having no mail server, and the UI says so rather than implying otherwise.
+
+## Configuration and deployment
+
+Everything environment-driven lives in `backend/app/config.py`, with a
+documented template at `backend/.env.example`. Nothing is required for local
+development; every default is tuned for `http://localhost`.
+
+```bash
+cp backend/.env.example backend/.env      # then edit
+uvicorn app.main:app --env-file .env
+```
+
+**A production deploy that is misconfigured refuses to start.** With
+`COGNISENSE_ENV=production`, `config.validate()` raises on boot if cookies are
+not `Secure`, if the allowed origins are empty, still contain `localhost`, or
+are plain `http://`, or if the VAPID subject is still the placeholder. Failing
+closed is deliberate: a warning in a log scrolls past and the server keeps
+serving, which is precisely how an insecure deploy survives. In development the
+same list is only logged, so a developer sees what would break a deploy without
+being blocked.
+
+The startup log prints the active configuration, so the security posture is
+visible rather than assumed:
+
+```
+config environment        development
+config cookie_secure      False
+config allowed_origins    ['http://localhost:5173', ...]
+config trusted_proxies    none (X-Forwarded-For ignored)
+config session_idle_days  7
+```
+
+| Variable | Default | Notes |
+|---|---|---|
+| `COGNISENSE_ENV` | `development` | `production` makes the startup check fatal |
+| `COGNISENSE_COOKIE_SECURE` | on in production | must be off for plain-http local dev |
+| `COGNISENSE_ALLOWED_ORIGINS` | dev origins | CORS **and** the CSRF Origin check |
+| `COGNISENSE_TRUSTED_PROXIES` | *(empty)* | see below — empty is the safe default |
+| `COGNISENSE_SESSION_TTL_DAYS` | `30` | absolute session lifetime |
+| `COGNISENSE_SESSION_IDLE_DAYS` | `7` | idle expiry, for lost devices |
+| `COGNISENSE_VAPID_SUBJECT` | placeholder | rejected in production |
+| `COGNISENSE_LOG_LEVEL` | `INFO` | `DEBUG` traces scheduler decisions |
+
+**`X-Forwarded-For` is ignored unless a trusted proxy is configured.** It used
+to be believed whenever present — and since any client can set a header, sending
+a different value each request bought a fresh per-IP rate-limit budget every
+time, making the address limit decorative. Now the header is read only when the
+direct peer is listed in `COGNISENSE_TRUSTED_PROXIES`; with none set, the socket
+address is always used. Set it to the address the proxy connects *from*
+(`127.0.0.1` for nginx on the same host), and make the proxy strip inbound
+`X-Forwarded-For`, or a client can still prepend a forged entry.
+
+**Sessions expire on idle as well as absolutely.** A 30-day session untouched
+for 28 of them is exactly the session sitting on a lost laptop, so 7 days of
+inactivity ends it. Active use refreshes the clock on every request.
 
 ## Notifications (`/push`)
 

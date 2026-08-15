@@ -27,12 +27,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app import config
 from app.database import SessionLocal
 from app.models.push import PushSubscription
 from app.models.reminder import STATUS_PENDING, ReminderItem
@@ -42,19 +42,12 @@ from app.notifications.sender import notify_user
 logger = logging.getLogger(__name__)
 
 
-def _env_int(name: str, default: int) -> int:
-    try:
-        return int(os.environ.get(name, default))
-    except (TypeError, ValueError):
-        return default
-
-
-TICK_SECONDS = _env_int("COGNISENSE_PUSH_TICK_SECONDS", 60)
-COOLDOWN_HOURS = _env_int("COGNISENSE_PUSH_COOLDOWN_HOURS", 6)
+TICK_SECONDS = config.PUSH_TICK_SECONDS
+COOLDOWN_HOURS = config.PUSH_COOLDOWN_HOURS
 
 # Set COGNISENSE_DISABLE_SCHEDULER=1 to keep the loop out of the way -- tests
 # set it so a background thread cannot touch the database mid-assertion.
-DISABLED = os.environ.get("COGNISENSE_DISABLE_SCHEDULER", "").strip() in {"1", "true", "yes"}
+DISABLED = config.DISABLE_SCHEDULER
 
 
 def is_awake(user: User, now_utc: datetime | None = None) -> bool:
