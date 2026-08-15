@@ -212,14 +212,20 @@ def test_tick_respects_the_cooldown(db):
     first = scheduler.run_tick(db, now_utc=at(8))
     assert first["pushed"] == 1
 
-    # One hour later, well inside the 6h cooldown.
+    # One hour later, well inside the cooldown whatever it is set to.
     second = scheduler.run_tick(db, now_utc=at(9))
     assert second["cooling_down"] == 1
     assert second["pushed"] == 0
     assert len(db.sent) == 1
 
-    # After the cooldown has elapsed it fires again.
-    third = scheduler.run_tick(db, now_utc=at(8) + timedelta(hours=7))
+    # After the cooldown has elapsed it fires again. Derived from the constant
+    # rather than hardcoded, so tuning the cooldown does not silently turn this
+    # into a test of nothing.
+    later = at(8) + timedelta(hours=scheduler.COOLDOWN_HOURS + 1)
+    assert scheduler.is_awake(db.query(User).get(1), later), (
+        "fixture assumption: the retry must land inside waking hours"
+    )
+    third = scheduler.run_tick(db, now_utc=later)
     assert third["pushed"] == 1
     assert len(db.sent) == 2
 

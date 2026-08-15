@@ -157,9 +157,9 @@ def test_a_correct_production_config_passes(monkeypatch):
         monkeypatch,
         COGNISENSE_ENV="production",
         COGNISENSE_COOKIE_SECURE="1",
-        COGNISENSE_ALLOWED_ORIGINS="https://cognisense.example",
-        COGNISENSE_VAPID_SUBJECT="mailto:ops@example.com",
-        COGNISENSE_PUBLIC_URL="https://cognisense.example",
+        COGNISENSE_ALLOWED_ORIGINS="https://cognisense.app",
+        COGNISENSE_VAPID_SUBJECT="mailto:ops@cognisense.app",
+        COGNISENSE_PUBLIC_URL="https://cognisense.app",
     )
     assert cfg.problems() == []
     cfg.validate()
@@ -171,8 +171,8 @@ def test_production_rejects_a_localhost_public_url(monkeypatch):
         monkeypatch,
         COGNISENSE_ENV="production",
         COGNISENSE_COOKIE_SECURE="1",
-        COGNISENSE_ALLOWED_ORIGINS="https://cognisense.example",
-        COGNISENSE_VAPID_SUBJECT="mailto:ops@example.com",
+        COGNISENSE_ALLOWED_ORIGINS="https://cognisense.app",
+        COGNISENSE_VAPID_SUBJECT="mailto:ops@cognisense.app",
         COGNISENSE_PUBLIC_URL="http://localhost:5173",
     )
     assert any("PUBLIC_URL" in p for p in cfg.problems())
@@ -184,12 +184,63 @@ def test_production_rejects_a_placeholder_mail_sender(monkeypatch):
         monkeypatch,
         COGNISENSE_ENV="production",
         COGNISENSE_COOKIE_SECURE="1",
-        COGNISENSE_ALLOWED_ORIGINS="https://cognisense.example",
-        COGNISENSE_VAPID_SUBJECT="mailto:ops@example.com",
+        COGNISENSE_ALLOWED_ORIGINS="https://cognisense.app",
+        COGNISENSE_VAPID_SUBJECT="mailto:ops@cognisense.app",
         COGNISENSE_PUBLIC_URL="https://cognisense.example",
         COGNISENSE_SMTP_HOST="smtp.example.com",
     )
     assert any("SMTP_FROM" in p for p in cfg.problems())
+
+
+@pytest.mark.parametrize("domain", [
+    "cognisense.example",   # the literal placeholder in the template
+    "app.invalid",
+    "staging.test",
+    "thing.localhost",
+])
+def test_production_rejects_reserved_placeholder_domains(monkeypatch, domain):
+    """Copying the template and forgetting the find/replace must not boot.
+
+    These TLDs are reserved by RFC 2606 / 6761 and can never resolve, so one in
+    production config always means an unreplaced placeholder. Otherwise the
+    server starts happily and mails reset links to a domain nobody owns.
+    """
+    cfg = _reloaded(
+        monkeypatch,
+        COGNISENSE_ENV="production",
+        COGNISENSE_COOKIE_SECURE="1",
+        COGNISENSE_ALLOWED_ORIGINS=f"https://{domain}",
+        COGNISENSE_PUBLIC_URL=f"https://{domain}",
+        COGNISENSE_VAPID_SUBJECT="mailto:ops@example.org",
+    )
+    assert any("placeholder domains" in p for p in cfg.problems()), (
+        f"{domain} should have been recognised as a placeholder"
+    )
+
+
+def test_a_real_domain_is_not_mistaken_for_a_placeholder(monkeypatch):
+    """The check must not reject a legitimate domain that merely looks similar."""
+    cfg = _reloaded(
+        monkeypatch,
+        COGNISENSE_ENV="production",
+        COGNISENSE_COOKIE_SECURE="1",
+        COGNISENSE_ALLOWED_ORIGINS="https://cognisense.app",
+        COGNISENSE_PUBLIC_URL="https://cognisense.app",
+        COGNISENSE_VAPID_SUBJECT="mailto:ops@cognisense.app",
+    )
+    assert cfg.problems() == []
+
+
+def test_a_placeholder_vapid_address_is_caught(monkeypatch):
+    cfg = _reloaded(
+        monkeypatch,
+        COGNISENSE_ENV="production",
+        COGNISENSE_COOKIE_SECURE="1",
+        COGNISENSE_ALLOWED_ORIGINS="https://cognisense.app",
+        COGNISENSE_PUBLIC_URL="https://cognisense.app",
+        COGNISENSE_VAPID_SUBJECT="mailto:you@cognisense.example",
+    )
+    assert any("placeholder domains" in p for p in cfg.problems())
 
 
 def test_email_is_disabled_without_an_smtp_host(monkeypatch):
@@ -214,8 +265,31 @@ def test_trusted_proxies_default_to_none(monkeypatch):
 
 
 def test_a_nonsense_integer_falls_back_rather_than_crashing(monkeypatch):
+    monkeypatch.delenv("COGNISENSE_SESSION_IDLE_DAYS", raising=False)
+    default = importlib.reload(config).SESSION_IDLE_DAYS
+
     cfg = _reloaded(monkeypatch, COGNISENSE_SESSION_IDLE_DAYS="not-a-number")
-    assert cfg.SESSION_IDLE_DAYS == 7
+    assert cfg.SESSION_IDLE_DAYS == default
+
+
+def test_idle_must_be_below_the_absolute_cap(monkeypatch):
+    """An idle window at or above the TTL can never fire -- a silent no-op."""
+    cfg = _reloaded(
+        monkeypatch,
+        COGNISENSE_SESSION_TTL_DAYS="30",
+        COGNISENSE_SESSION_IDLE_DAYS="30",
+    )
+    assert any("idle expiry can never take effect" in p for p in cfg.problems())
+
+
+def test_the_shipped_defaults_are_coherent(monkeypatch):
+    """The values tuned for this app must satisfy their own invariant."""
+    for key in ("COGNISENSE_SESSION_TTL_DAYS", "COGNISENSE_SESSION_IDLE_DAYS"):
+        monkeypatch.delenv(key, raising=False)
+    cfg = importlib.reload(config)
+
+    assert cfg.SESSION_IDLE_DAYS < cfg.SESSION_TTL_DAYS
+    assert cfg.problems() == []
 
 
 # --------------------------------------------------------------------------

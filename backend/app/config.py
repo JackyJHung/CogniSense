@@ -90,13 +90,25 @@ TRUSTED_PROXIES = _csv("COGNISENSE_TRUSTED_PROXIES", "")
 # Sessions
 # --------------------------------------------------------------------------
 
-SESSION_TTL_DAYS = _int("COGNISENSE_SESSION_TTL_DAYS", 30)
+# Absolute cap. Even a session in constant use is re-authenticated eventually.
+SESSION_TTL_DAYS = _int("COGNISENSE_SESSION_TTL_DAYS", 90)
 
-# Absolute lifetime is not enough on a shared or lost device: a session created
-# 29 days ago and untouched for 28 of them is still valid. Idle expiry closes
-# the window on abandoned sessions without forcing a daily login on someone who
-# actually uses the app.
-SESSION_IDLE_DAYS = _int("COGNISENSE_SESSION_IDLE_DAYS", 7)
+# Idle expiry, and the one that actually binds in practice.
+#
+# TUNED FOR THIS APP'S USERS, not from a general default. Seven days is the
+# usual advice and it is wrong here: the people using CogniSense are tracking
+# cognitive decline, and someone who misses a week is exactly the person least
+# able to recall a password on being logged out. An idle timeout that fires on
+# a missed week lands hardest on the users the app exists for, and the likely
+# outcome is that they stop using it rather than that they log back in.
+#
+# Thirty days lets somebody miss a month -- illness, a hospital stay, a holiday
+# -- and come back to a working session, while still closing the window on a
+# device that is genuinely gone.
+#
+# MUST stay below SESSION_TTL_DAYS or it never fires: the absolute cap would
+# expire the session first and this setting would be inert. validate() checks.
+SESSION_IDLE_DAYS = _int("COGNISENSE_SESSION_IDLE_DAYS", 30)
 
 # --------------------------------------------------------------------------
 # Notifications
@@ -104,7 +116,12 @@ SESSION_IDLE_DAYS = _int("COGNISENSE_SESSION_IDLE_DAYS", 7)
 
 VAPID_SUBJECT = os.environ.get("COGNISENSE_VAPID_SUBJECT", "mailto:admin@cognisense.local")
 PUSH_TICK_SECONDS = _int("COGNISENSE_PUSH_TICK_SECONDS", 60)
-PUSH_COOLDOWN_HOURS = _int("COGNISENSE_PUSH_COOLDOWN_HOURS", 6)
+
+# Eight hours rather than six: across a ~15-hour waking day that is about two
+# prompts, which matches the rhythm the morning/midday/evening check-in flow
+# already assumes. Six gives three or four, which reads as nagging -- and a
+# reminder app people mute is worse than one that asks less often.
+PUSH_COOLDOWN_HOURS = _int("COGNISENSE_PUSH_COOLDOWN_HOURS", 8)
 DISABLE_SCHEDULER = _flag("COGNISENSE_DISABLE_SCHEDULER")
 
 # --------------------------------------------------------------------------
@@ -142,9 +159,43 @@ class ConfigError(RuntimeError):
     """Raised for a production configuration that is unsafe to serve."""
 
 
+# TLDs reserved by RFC 2606 / RFC 6761 for documentation and testing. None can
+# ever resolve on the public internet, so one appearing in production config
+# means a template was copied and the placeholder never replaced -- the single
+# most likely deployment mistake, and otherwise a silent one: the server would
+# start and mail reset links pointing at a domain nobody owns.
+_RESERVED_TLDS = (".example", ".invalid", ".test", ".localhost")
+
+
+def _is_placeholder(value: str) -> bool:
+    """True if `value`'s host sits under a reserved TLD.
+
+    Has to cope with three shapes that all appear in this config:
+        https://host:port/path        origins and PUBLIC_URL
+        mailto:someone@host           VAPID_SUBJECT
+        Display Name <user@host>      SMTP_FROM
+    An address is recognised by its '@' -- splitting on ':' first would take
+    "mailto" as the host and quietly match nothing.
+    """
+    text = value.strip().lower().rstrip(">")
+    host = text.rsplit("@", 1)[1] if "@" in text else text.split("//")[-1]
+    host = host.split("/")[0].split(">")[0].split(":")[0].rstrip(".")
+    return host.endswith(_RESERVED_TLDS)
+
+
 def problems() -> list[str]:
     """Security settings that are wrong for the declared environment."""
     found: list[str] = []
+
+    # Checked everywhere, because it is a mistake in any environment: an idle
+    # window at or above the absolute cap can never fire, so the setting silently
+    # does nothing and sessions only ever expire on the absolute clock.
+    if SESSION_IDLE_DAYS >= SESSION_TTL_DAYS:
+        found.append(
+            f"COGNISENSE_SESSION_IDLE_DAYS ({SESSION_IDLE_DAYS}) is not below "
+            f"COGNISENSE_SESSION_TTL_DAYS ({SESSION_TTL_DAYS}), so idle expiry "
+            f"can never take effect."
+        )
 
     if not IS_PRODUCTION:
         return found
@@ -188,6 +239,19 @@ def problems() -> list[str]:
             f"COGNISENSE_PUBLIC_URL is {PUBLIC_URL!r}. Links inside password-reset "
             "emails are built from it, so a localhost or plain-http value sends "
             "users a link that does not work."
+        )
+
+    placeholders = sorted(
+        {o for o in ALLOWED_ORIGINS if _is_placeholder(o)}
+        | ({PUBLIC_URL} if _is_placeholder(PUBLIC_URL) else set())
+        | ({VAPID_SUBJECT} if _is_placeholder(VAPID_SUBJECT) else set())
+        | ({SMTP_FROM} if EMAIL_ENABLED and _is_placeholder(SMTP_FROM) else set())
+    )
+    if placeholders:
+        found.append(
+            "Configuration still contains placeholder domains from the template: "
+            f"{', '.join(placeholders)}. Replace cognisense.example with your "
+            "real domain."
         )
 
     if EMAIL_ENABLED and SMTP_FROM.endswith("@cognisense.local>"):

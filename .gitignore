@@ -31,7 +31,11 @@ backend/app/db/
 # === Secrets / credentials ==================================================
 .env
 .env.*
+# Templates are documentation and carry no secrets, so they are un-ignored.
+# The second pattern is needed for names like .env.production.example -- the
+# first only matches the exact name .env.example and would otherwise hide them.
 !.env.example
+!.env.*.example
 *.pem
 *.key
 *.crt

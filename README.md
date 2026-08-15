@@ -375,8 +375,8 @@ config session_idle_days  7
 | `COGNISENSE_COOKIE_SECURE` | on in production | must be off for plain-http local dev |
 | `COGNISENSE_ALLOWED_ORIGINS` | dev origins | CORS **and** the CSRF Origin check |
 | `COGNISENSE_TRUSTED_PROXIES` | *(empty)* | see below — empty is the safe default |
-| `COGNISENSE_SESSION_TTL_DAYS` | `30` | absolute session lifetime |
-| `COGNISENSE_SESSION_IDLE_DAYS` | `7` | idle expiry, for lost devices |
+| `COGNISENSE_SESSION_TTL_DAYS` | `90` | absolute cap; must exceed the idle window |
+| `COGNISENSE_SESSION_IDLE_DAYS` | `30` | idle expiry — see below, tuned for this app |
 | `COGNISENSE_VAPID_SUBJECT` | placeholder | rejected in production |
 | `COGNISENSE_PUBLIC_URL` | `http://localhost:5173` | links in emails are built from it |
 | `COGNISENSE_SMTP_HOST` | *(empty)* | empty = log emails instead of sending |
@@ -392,9 +392,38 @@ address is always used. Set it to the address the proxy connects *from*
 (`127.0.0.1` for nginx on the same host), and make the proxy strip inbound
 `X-Forwarded-For`, or a client can still prepend a forged entry.
 
-**Sessions expire on idle as well as absolutely.** A 30-day session untouched
-for 28 of them is exactly the session sitting on a lost laptop, so 7 days of
-inactivity ends it. Active use refreshes the clock on every request.
+**Sessions expire on idle as well as absolutely**, and the idle window is the
+one that binds: 30 days idle inside a 90-day absolute cap. Active use refreshes
+the clock on every request.
+
+Thirty is deliberately not the usual seven. CogniSense's users are tracking
+cognitive decline, and somebody who misses a week is precisely the person least
+able to recall a password on being logged out — a short idle timeout lands
+hardest on the users the app exists for, and the likely result is that they stop
+using it rather than that they log back in. Thirty days absorbs an illness or a
+hospital stay while still closing the window on a device that is genuinely gone.
+
+The idle window **must** stay below the absolute cap, or it can never fire and
+becomes a silent no-op; startup rejects that combination.
+
+### Deploying
+
+`backend/.env.production.example` is a filled-in template. Copy it and replace
+`cognisense.example` with your domain — that substitution is the only edit
+required:
+
+```bash
+cp backend/.env.production.example backend/.env
+# replace cognisense.example throughout, then:
+uvicorn app.main:app --env-file .env --host 127.0.0.1 --port 8000
+```
+
+A half-finished copy fails at boot rather than serving. In particular, leaving
+the placeholder domain in place is rejected: `.example`, `.invalid`, `.test` and
+`.localhost` are reserved by RFC 2606 / 6761 and can never resolve, so one
+appearing in production config always means an unreplaced placeholder — and
+without the check the server would start and mail reset links to a domain nobody
+owns.
 
 ## Notifications (`/push`)
 
