@@ -1,0 +1,73 @@
+# CogniSense — single-VM deployment.
+#
+# Two services from ONE image:
+#
+#   web        gunicorn, 2 uvicorn workers, scheduler disabled
+#   scheduler  exactly one reminder loop
+#
+# The split is not tidiness. `scheduler.start()` runs in the FastAPI startup
+# hook, which executes once per worker, so `--workers 2` would run two reminder
+# loops against one database. The cooldown in users.last_push_at usually saves
+# it, but the read and write are not atomic and simultaneous ticks can both
+# send. See backend/app/scheduler_main.py.
+#
+#   docker compose up -d --build
+#   docker compose logs -f web
+#
+# Bound to 127.0.0.1 only. nginx terminates TLS and proxies to it; the container
+# port is never reachable from outside the VM.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cognisense:latest
+    restart: unless-stopped
+    # 127.0.0.1 prefix matters. "8000:8000" would publish on every interface
+    # and, on many distros, punch through the firewall via docker's iptables
+    # rules — exposing the app unencrypted alongside the TLS one.
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - backend/.env
+    environment:
+      # The web workers must NOT run the reminder loop; the scheduler service
+      # below owns it.
+      COGNISENSE_DISABLE_SCHEDULER: "1"
+    volumes:
+      # SQLite database. Without this, every redeploy silently starts an empty
+      # database and every account is gone.
+      - cognisense-db:/app/backend/db
+      # Uploaded audio, reminder photos, and the VAPID private key. Regenerating
+      # that key invalidates every existing push subscription, so it has to
+      # outlive the container just as much as the database does.
+      - cognisense-data:/app/backend/app/db
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+  scheduler:
+    image: cognisense:latest
+    # Built by `web`; this reuses the same image rather than building twice.
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    command: ["python", "-m", "app.scheduler_main"]
+    env_file:
+      - backend/.env
+    environment:
+      # Explicitly empty: scheduler_main refuses to start if this is set,
+      # rather than sitting there doing nothing.
+      COGNISENSE_DISABLE_SCHEDULER: ""
+    volumes:
+      - cognisense-db:/app/backend/db
+      - cognisense-data:/app/backend/app/db
+
+volumes:
+  cognisense-db:
+  cognisense-data:

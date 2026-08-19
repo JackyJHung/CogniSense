@@ -1,0 +1,70 @@
+# Everything the build does not need, plus everything it must never see.
+#
+# Two jobs. Keeping the context small is the minor one; keeping secrets and user
+# data out of the image is the point. A COPY of the repo root would otherwise
+# pull in the SQLite database (usernames, bcrypt hashes, cognitive scores),
+# uploaded voice recordings and photos, and the VAPID private key — baked into
+# every layer, readable by anyone who pulls the image, and undeleteable because
+# layers are immutable.
+
+# === Secrets and user data — NEVER in an image ==============================
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+
+backend/db/
+backend/app/db/
+**/*.pem
+**/*.key
+**/cognisense.db
+**/cognisense.db-journal
+**/cognisense.db-wal
+**/cognisense.db-shm
+
+# Uploaded media.
+**/audio/
+**/reminders/
+**/user_photos/
+
+# === Rebuilt inside the image ==============================================
+# Checkpoints are retrained by the Dockerfile; a stale host copy would be
+# silently baked in instead.
+backend/app/ml/checkpoints/
+
+# node_modules is reinstalled by `npm ci` in the web stage. Copying the host
+# copy would be slower AND wrong — host binaries may not match the build image.
+**/node_modules/
+web_app/dist/
+
+# === Python cruft ==========================================================
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/venv/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.coverage
+**/htmlcov/
+**/*.egg-info/
+
+# === Not needed at runtime =================================================
+.git/
+.gitignore
+.github/
+.claude/
+backend/tests/
+backend/results/
+docs/
+desktop_app/
+mobile_app/
+**/README.md
+!README.md
+**/*.log
+
+# === Editor / OS ===========================================================
+.vscode/
+.idea/
+**/.DS_Store
+**/Thumbs.db
