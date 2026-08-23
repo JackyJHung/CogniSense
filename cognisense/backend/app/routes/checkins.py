@@ -9,8 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.user import User
 from app.models.checkin import MorningCheckin, MiddayCheckin, EveningCheckin
+from app.routes.deps import get_user_or_404, get_morning_checkin_or_404
 from app.models.image_association import ImageAssociation, seed_associations
 from app.schemas import (
     MorningCheckinCreate, MorningCheckinOut, AssociationPresented,
@@ -58,9 +58,7 @@ def _get_behavioral_scorer():
 @router.post("/morning", response_model=MorningCheckinOut, status_code=status.HTTP_201_CREATED)
 def create_morning_checkin(payload: MorningCheckinCreate, db: Session = Depends(get_db)):
     """Record the user's planned activities and return 5 image associations to remember."""
-    user = db.query(User).filter(User.id == payload.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = get_user_or_404(db, payload.user_id)
 
     # Ensure the image pool is seeded
     seed_associations(db)
@@ -100,9 +98,7 @@ async def upload_morning_audio(
     db: Session = Depends(get_db),
 ):
     """Optional: attach an audio recording of the user reciting their plans."""
-    morning = db.query(MorningCheckin).filter(MorningCheckin.id == morning_id).first()
-    if not morning:
-        raise HTTPException(status_code=404, detail="Morning check-in not found")
+    morning = get_morning_checkin_or_404(db, morning_id)
 
     file_path = AUDIO_DIR / f"morning_{morning_id}_{audio.filename}"
     with open(file_path, "wb") as f:
@@ -126,9 +122,7 @@ async def upload_morning_audio(
 
 @router.post("/midday", response_model=MiddayCheckinOut, status_code=status.HTTP_201_CREATED)
 def create_midday_checkin(payload: MiddayCheckinCreate, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == payload.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = get_user_or_404(db, payload.user_id)
 
     mc = MiddayCheckin(
         user_id=user.id,
@@ -158,13 +152,9 @@ def create_midday_checkin(payload: MiddayCheckinCreate, db: Session = Depends(ge
 def create_evening_checkin(payload: EveningCheckinCreate, db: Session = Depends(get_db)):
     """Core scoring endpoint. Grades the morning image-association test and computes
     the daily cognitive score via the behavioral model."""
-    user = db.query(User).filter(User.id == payload.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = get_user_or_404(db, payload.user_id)
 
-    morning = db.query(MorningCheckin).filter(MorningCheckin.id == payload.morning_checkin_id).first()
-    if not morning:
-        raise HTTPException(status_code=404, detail="Morning check-in not found")
+    morning = get_morning_checkin_or_404(db, payload.morning_checkin_id)
     if morning.user_id != user.id:
         raise HTTPException(status_code=403, detail="Morning check-in does not belong to user")
 

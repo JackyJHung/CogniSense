@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, ScrollView, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, Button, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { getCurrentUser, getDailySuggestions } from '../api';
+import { showApiError } from '../utils';
 import Disclaimer from '../components/Disclaimer';
 
 export default function SuggestionsScreen({ navigation }) {
@@ -14,7 +15,7 @@ export default function SuggestionsScreen({ navigation }) {
         const ds = await getDailySuggestions(user.id);
         setData(ds);
       } catch (e) {
-        Alert.alert('Error', e?.response?.data?.detail ?? e.message);
+        showApiError(e);
       } finally {
         setLoading(false);
       }

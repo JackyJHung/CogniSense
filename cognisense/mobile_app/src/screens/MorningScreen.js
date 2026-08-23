@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
 import { getCurrentUser, morningCheckin } from '../api';
+import { showApiError } from '../utils';
 import Disclaimer from '../components/Disclaimer';
 
 export default function MorningScreen({ navigation }) {
@@ -19,7 +20,7 @@ export default function MorningScreen({ navigation }) {
       global.currentMorning = result;
       setAssociations(result.presented_associations);
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.detail ?? e.message);
+      showApiError(e);
     }
   };
 

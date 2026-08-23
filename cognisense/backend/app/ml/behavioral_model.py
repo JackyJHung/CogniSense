@@ -24,14 +24,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-import torch
 import torch.nn as nn
+
+from app.ml.inference import CHECKPOINT_DIR, NormalcyScorer
 
 
 BEHAV_FEATURES = 8
-MODEL_DIR = Path(__file__).resolve().parent / "checkpoints"
-MODEL_DIR.mkdir(exist_ok=True)
-BEHAV_CKPT = MODEL_DIR / "behavioral_mlp.pt"
+BEHAV_CKPT = CHECKPOINT_DIR / "behavioral_mlp.pt"
 
 
 class BehavioralBiomarkerMLP(nn.Module):
@@ -49,7 +48,7 @@ class BehavioralBiomarkerMLP(nn.Module):
             nn.Linear(32, 1),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         return self.net(x)
 
 
@@ -117,23 +116,13 @@ def build_behavioral_feature_vector(
 # Inference wrapper
 # -----------------------------------------------------------------------------
 
-class BehavioralScorer:
+class BehavioralScorer(NormalcyScorer):
     def __init__(self, ckpt_path: Path = BEHAV_CKPT, device: str = "cpu"):
-        self.device = torch.device(device)
-        self.model = BehavioralBiomarkerMLP().to(self.device)
-        if ckpt_path.exists():
-            state = torch.load(ckpt_path, map_location=self.device)
-            self.model.load_state_dict(state)
-        self.model.eval()
+        super().__init__(BehavioralBiomarkerMLP(), ckpt_path, device)
 
-    @torch.no_grad()
     def score(self, features: np.ndarray) -> float:
         """
         features: shape (BEHAV_FEATURES,)
         returns: float in [0,1], 'normalcy' score (HIGHER = more normal).
         """
-        x = torch.from_numpy(features).unsqueeze(0).to(self.device)
-        logits = self.model(x)
-        # Model is trained so positive logit = concerning; flip so higher=normal
-        p_concern = torch.sigmoid(logits).item()
-        return float(1.0 - p_concern)
+        return self.score_array(features)

@@ -24,9 +24,10 @@ approval.
 from __future__ import annotations
 from pathlib import Path
 
-import torch
 import torch.nn as nn
 import numpy as np
+
+from app.ml.inference import CHECKPOINT_DIR, NormalcyScorer, normalize_array
 
 try:
     import librosa
@@ -37,9 +38,7 @@ except ImportError:
 
 MFCC_DIM = 40
 FRAMES = 200
-MODEL_DIR = Path(__file__).resolve().parent / "checkpoints"
-MODEL_DIR.mkdir(exist_ok=True)
-SPEECH_CKPT = MODEL_DIR / "speech_cnn.pt"
+SPEECH_CKPT = CHECKPOINT_DIR / "speech_cnn.pt"
 
 
 class SpeechBiomarkerCNN(nn.Module):
@@ -70,7 +69,7 @@ class SpeechBiomarkerCNN(nn.Module):
             nn.Linear(64, 1),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         # x: (B, n_mfcc, n_frames)
         h = self.features(x)
         logits = self.classifier(h)
@@ -102,8 +101,7 @@ def audio_to_mfcc(audio_path: str | Path, sr: int = 16000, duration_s: float = 5
     else:
         pad = FRAMES - mfcc.shape[1]
         mfcc = np.pad(mfcc, ((0, 0), (0, pad)))
-    # Normalise
-    mfcc = (mfcc - mfcc.mean()) / (mfcc.std() + 1e-8)
+    mfcc = normalize_array(mfcc)
     return mfcc.astype(np.float32)
 
 
@@ -111,33 +109,19 @@ def audio_to_mfcc(audio_path: str | Path, sr: int = 16000, duration_s: float = 5
 # Inference wrapper
 # -----------------------------------------------------------------------------
 
-class SpeechScorer:
+class SpeechScorer(NormalcyScorer):
     """Thin wrapper: load checkpoint and score an audio file -> 0..1."""
 
     def __init__(self, ckpt_path: Path = SPEECH_CKPT, device: str = "cpu"):
-        self.device = torch.device(device)
-        self.model = SpeechBiomarkerCNN().to(self.device)
-        if ckpt_path.exists():
-            state = torch.load(ckpt_path, map_location=self.device)
-            self.model.load_state_dict(state)
-        self.model.eval()
+        super().__init__(SpeechBiomarkerCNN(), ckpt_path, device)
 
-    @torch.no_grad()
     def score_audio(self, audio_path: str | Path) -> float:
         """
         Returns a 'normalcy' score in [0,1] where HIGHER = more normal speech
         pattern. (The model outputs P(concerning); we return 1 - P.)
         """
-        mfcc = audio_to_mfcc(audio_path)
-        x = torch.from_numpy(mfcc).unsqueeze(0).to(self.device)   # (1, n_mfcc, frames)
-        logits = self.model(x)
-        p_concern = torch.sigmoid(logits).item()
-        return float(1.0 - p_concern)
+        return self.score_array(audio_to_mfcc(audio_path))
 
-    @torch.no_grad()
     def score_mfcc_array(self, mfcc: np.ndarray) -> float:
         """Score from a pre-computed MFCC array (for testing without audio)."""
-        x = torch.from_numpy(mfcc).unsqueeze(0).to(self.device)
-        logits = self.model(x)
-        p_concern = torch.sigmoid(logits).item()
-        return float(1.0 - p_concern)
+        return self.score_array(mfcc)

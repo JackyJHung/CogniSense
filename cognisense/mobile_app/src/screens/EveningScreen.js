@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, ScrollView, StyleSheet } from 'react-native';
 import { getCurrentUser, eveningCheckin } from '../api';
+import { showApiError } from '../utils';
 import Disclaimer from '../components/Disclaimer';
 
 export default function EveningScreen({ navigation }) {
@@ -47,7 +48,7 @@ export default function EveningScreen({ navigation }) {
       const ev = await eveningCheckin(user.id, morning.id, recalled, responses);
       setResult(ev);
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.detail ?? e.message);
+      showApiError(e);
     }
   };
 

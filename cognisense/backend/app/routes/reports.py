@@ -1,12 +1,12 @@
 """Reports and risk-comparison endpoints."""
 
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.user import User
 from app.models.checkin import EveningCheckin
+from app.routes.deps import get_user_or_404
 from app.schemas import RiskComparisonOut, DailySuggestionsOut
 from app.data.research_benchmarks import (
     LANCET_2024_RISK_FACTORS,
@@ -28,9 +28,7 @@ def get_risk_comparison(
     Compare user's recent cognitive scores (last `window_days` days) against
     their own earlier baseline AND against age/gender/race research benchmarks.
     """
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = get_user_or_404(db, user_id)
 
     cutoff = datetime.utcnow() - timedelta(days=window_days)
 
@@ -76,9 +74,7 @@ def get_risk_comparison(
 @router.get("/daily-suggestions/{user_id}", response_model=DailySuggestionsOut)
 def get_daily_suggestions(user_id: int, db: Session = Depends(get_db)):
     """Return 3 research-backed daily prevention suggestions personalized by age."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = get_user_or_404(db, user_id)
 
     suggestions = personalized_suggestions(user.age, elevated_concern=False, n=3)
 
@@ -99,9 +95,7 @@ def get_trend(
     db: Session = Depends(get_db),
 ):
     """Return a time series of daily cognitive scores for charting."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    get_user_or_404(db, user_id)
 
     cutoff = datetime.utcnow() - timedelta(days=days)
     rows = (

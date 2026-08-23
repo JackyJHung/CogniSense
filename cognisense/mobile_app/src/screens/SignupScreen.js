@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, ScrollView, StyleSheet } from 'react-native';
 import { signup, login } from '../api';
+import { showApiError } from '../utils';
 import Disclaimer from '../components/Disclaimer';
 
 const GENDERS = ['female', 'male', 'nonbinary', 'other', 'prefer_not'];
@@ -26,7 +27,7 @@ export default function SignupScreen({ navigation }) {
       await login(form.username, form.password);
       navigation.replace('Dashboard');
     } catch (e) {
-      Alert.alert('Sign-up failed', e?.response?.data?.detail ?? e.message);
+      showApiError(e, 'Sign-up failed');
     }
   };
 
