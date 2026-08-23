@@ -1,12 +1,16 @@
 """SQLite + SQLAlchemy setup for CogniSense."""
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+import os
 from pathlib import Path
 
-DB_DIR = Path(__file__).resolve().parent.parent / "db"
-DB_DIR.mkdir(exist_ok=True)
-DB_PATH = DB_DIR / "cognisense.db"
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+
+DB_PATH = Path(
+    os.getenv("COGNISENSE_DB_PATH")
+    or Path(__file__).resolve().parent.parent / "db" / "cognisense.db"
+)
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 

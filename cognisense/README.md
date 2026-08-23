@@ -63,6 +63,21 @@ python -m app.ml.train_models   # Trains demo models on synthetic data
 uvicorn app.main:app --reload
 ```
 
+#### Configuration
+
+All endpoints except `/`, `/health`, `/users/signup`, and `/users/login` require a
+bearer token (`Authorization: Bearer <access_token>`) returned by signup/login, and
+only ever expose the authenticated user's own data.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `COGNISENSE_ENV` | `development` | `production` disables `/docs` and requires an explicit secret key and CORS allow-list |
+| `COGNISENSE_SECRET_KEY` | random per process | JWT signing key; **required** in production |
+| `COGNISENSE_TOKEN_TTL_MINUTES` | `60` | Access-token lifetime |
+| `COGNISENSE_ALLOWED_ORIGINS` | localhost dev origins | Comma-separated CORS allow-list (no wildcards) |
+| `COGNISENSE_MAX_AUDIO_BYTES` | `10485760` | Upload size cap for voice clips |
+| `COGNISENSE_DB_PATH` | `backend/app/db/cognisense.db` | SQLite location |
+
 ### Desktop app
 ```bash
 cd desktop_app

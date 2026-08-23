@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import IS_PRODUCTION, allowed_origins
 from app.database import init_db
 from app.routes import users, checkins, reports
 from app.data.research_benchmarks import NON_DIAGNOSTIC_DISCLAIMER
@@ -16,15 +17,19 @@ app = FastAPI(
         "Suggestions are not medical advice."
     ),
     version="0.1.0",
+    # Interactive docs enumerate every endpoint and schema; keep them off in production.
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
 )
 
-# CORS: permissive for dev; tighten domain allow-list in production
+# CORS: explicit allow-list only (set COGNISENSE_ALLOWED_ORIGINS in production).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 

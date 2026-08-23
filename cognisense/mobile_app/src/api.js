@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const DEFAULT_BACKEND = 'http://10.0.2.2:8000';
 
 let backendUrl = DEFAULT_BACKEND;
+let accessToken = null;
 
 export async function setBackendUrl(url) {
   backendUrl = url;
@@ -22,23 +23,35 @@ export async function loadBackendUrl() {
   return backendUrl;
 }
 
+async function setSession(data) {
+  accessToken = data.access_token;
+  await AsyncStorage.setItem('accessToken', data.access_token);
+  await AsyncStorage.setItem('currentUser', JSON.stringify(data.user));
+  return data.user;
+}
+
+export async function loadSession() {
+  accessToken = await AsyncStorage.getItem('accessToken');
+  return accessToken;
+}
+
 function client() {
   return axios.create({
     baseURL: backendUrl,
     timeout: 15000,
+    headers: accessToken ? {Authorization: `Bearer ${accessToken}`} : {},
   });
 }
 
 // ---- Users ----
 export async function signup(payload) {
   const { data } = await client().post('/users/signup', payload);
-  return data;
+  return setSession(data);
 }
 
 export async function login(username, password) {
   const { data } = await client().post('/users/login', { username, password });
-  await AsyncStorage.setItem('currentUser', JSON.stringify(data));
-  return data;
+  return setSession(data);
 }
 
 export async function getCurrentUser() {
@@ -47,21 +60,22 @@ export async function getCurrentUser() {
 }
 
 export async function logout() {
-  await AsyncStorage.removeItem('currentUser');
+  accessToken = null;
+  await AsyncStorage.multiRemove(['accessToken', 'currentUser']);
 }
 
 // ---- Check-ins ----
-export async function morningCheckin(userId, plannedActivities) {
+// The authenticated user is derived from the bearer token server-side, so no
+// client-supplied user id is sent.
+export async function morningCheckin(plannedActivities) {
   const { data } = await client().post('/checkins/morning', {
-    user_id: userId,
     planned_activities: plannedActivities,
   });
   return data;
 }
 
-export async function middayCheckin(userId, morningId, whatDone, remainder, latencyMs) {
+export async function middayCheckin(morningId, whatDone, remainder, latencyMs) {
   const { data } = await client().post('/checkins/midday', {
-    user_id: userId,
     morning_checkin_id: morningId,
     what_user_has_done: whatDone,
     planned_remainder: remainder,
@@ -70,9 +84,8 @@ export async function middayCheckin(userId, morningId, whatDone, remainder, late
   return data;
 }
 
-export async function eveningCheckin(userId, morningId, recalled, responses) {
+export async function eveningCheckin(morningId, recalled, responses) {
   const { data } = await client().post('/checkins/evening', {
-    user_id: userId,
     morning_checkin_id: morningId,
     recalled_activities: recalled,
     association_responses: responses,

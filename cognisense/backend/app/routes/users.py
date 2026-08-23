@@ -2,19 +2,23 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
 
+from app.auth import (
+    create_access_token,
+    get_current_user,
+    hash_password,
+    require_self,
+    verify_password,
+)
 from app.database import get_db
 from app.models.user import User
-from app.schemas import UserCreate, UserOut, LoginRequest
+from app.schemas import LoginRequest, TokenOut, UserCreate, UserOut
 
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-
-@router.post("/signup", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post("/signup", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
 def signup(payload: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.username == payload.username).first()
     if existing:
@@ -22,7 +26,7 @@ def signup(payload: UserCreate, db: Session = Depends(get_db)):
 
     user = User(
         username=payload.username,
-        hashed_password=pwd_context.hash(payload.password),
+        hashed_password=hash_password(payload.password),
         age=payload.age,
         gender=payload.gender,
         race=payload.race,
@@ -32,20 +36,23 @@ def signup(payload: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
+    return TokenOut(access_token=create_access_token(user.id), user=UserOut.model_validate(user))
 
 
-@router.post("/login", response_model=UserOut)
+@router.post("/login", response_model=TokenOut)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == payload.username).first()
-    if not user or not pwd_context.verify(payload.password, user.hashed_password):
+    if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return user
+    return TokenOut(access_token=create_access_token(user.id), user=UserOut.model_validate(user))
+
+
+@router.get("/me", response_model=UserOut)
+def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
 
 
 @router.get("/{user_id}", response_model=UserOut)
-def get_user(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+def get_user(user_id: int, current_user: User = Depends(get_current_user)):
+    require_self(current_user, user_id)
+    return current_user
