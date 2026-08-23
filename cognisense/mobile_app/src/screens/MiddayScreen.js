@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
-import { getCurrentUser, middayCheckin } from '../api';
+import { middayCheckin } from '../api';
 import Disclaimer from '../components/Disclaimer';
 
 export default function MiddayScreen({ navigation }) {
@@ -14,10 +14,9 @@ export default function MiddayScreen({ navigation }) {
       return;
     }
     try {
-      const user = await getCurrentUser();
       const latencyMs = Date.now() - startTime.current;
       const morningId = global.currentMorning?.id ?? null;
-      await middayCheckin(user.id, morningId, done, remainder, latencyMs);
+      await middayCheckin(morningId, done, remainder, latencyMs);
       Alert.alert('Recorded', 'Midday check-in saved.', [
         { text: 'OK', onPress: () => navigation.navigate('Dashboard') },
       ]);

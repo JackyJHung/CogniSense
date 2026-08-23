@@ -1,9 +1,10 @@
 """Reports and risk-comparison endpoints."""
 
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user, require_self
 from app.database import get_db
 from app.models.user import User
 from app.models.checkin import EveningCheckin
@@ -23,14 +24,13 @@ def get_risk_comparison(
     user_id: int,
     window_days: int = Query(14, ge=7, le=90),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """
     Compare user's recent cognitive scores (last `window_days` days) against
     their own earlier baseline AND against age/gender/race research benchmarks.
     """
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    require_self(user, user_id)
 
     cutoff = datetime.utcnow() - timedelta(days=window_days)
 
@@ -74,11 +74,12 @@ def get_risk_comparison(
 
 
 @router.get("/daily-suggestions/{user_id}", response_model=DailySuggestionsOut)
-def get_daily_suggestions(user_id: int, db: Session = Depends(get_db)):
+def get_daily_suggestions(
+    user_id: int,
+    user: User = Depends(get_current_user),
+):
     """Return 3 research-backed daily prevention suggestions personalized by age."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    require_self(user, user_id)
 
     suggestions = personalized_suggestions(user.age, elevated_concern=False, n=3)
 
@@ -97,11 +98,10 @@ def get_trend(
     user_id: int,
     days: int = Query(30, ge=7, le=180),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """Return a time series of daily cognitive scores for charting."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    require_self(user, user_id)
 
     cutoff = datetime.utcnow() - timedelta(days=days)
     rows = (

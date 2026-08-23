@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
-import { getCurrentUser, eveningCheckin } from '../api';
+import { eveningCheckin } from '../api';
 import Disclaimer from '../components/Disclaimer';
 
 export default function EveningScreen({ navigation }) {
@@ -43,8 +43,7 @@ export default function EveningScreen({ navigation }) {
     }));
 
     try {
-      const user = await getCurrentUser();
-      const ev = await eveningCheckin(user.id, morning.id, recalled, responses);
+      const ev = await eveningCheckin(morning.id, recalled, responses);
       setResult(ev);
     } catch (e) {
       Alert.alert('Error', e?.response?.data?.detail ?? e.message);

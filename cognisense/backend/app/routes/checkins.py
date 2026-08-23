@@ -1,13 +1,14 @@
 """Check-in endpoints: morning (plan + image presentation), midday (light recall), evening (recall + test)."""
 
-import json
+import logging
 import random
 from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
+from app.config import ALLOWED_AUDIO_EXTENSIONS, MAX_AUDIO_UPLOAD_BYTES
 from app.database import get_db
 from app.models.user import User
 from app.models.checkin import MorningCheckin, MiddayCheckin, EveningCheckin
@@ -20,6 +21,8 @@ from app.schemas import (
 from app.data.research_benchmarks import NON_DIAGNOSTIC_DISCLAIMER
 from app.ml.behavioral_model import activity_overlap, build_behavioral_feature_vector
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/checkins", tags=["checkins"])
 
@@ -56,12 +59,12 @@ def _get_behavioral_scorer():
 # =============================================================================
 
 @router.post("/morning", response_model=MorningCheckinOut, status_code=status.HTTP_201_CREATED)
-def create_morning_checkin(payload: MorningCheckinCreate, db: Session = Depends(get_db)):
+def create_morning_checkin(
+    payload: MorningCheckinCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     """Record the user's planned activities and return 5 image associations to remember."""
-    user = db.query(User).filter(User.id == payload.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
     # Ensure the image pool is seeded
     seed_associations(db)
 
@@ -98,21 +101,37 @@ async def upload_morning_audio(
     morning_id: int,
     audio: UploadFile = File(...),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """Optional: attach an audio recording of the user reciting their plans."""
     morning = db.query(MorningCheckin).filter(MorningCheckin.id == morning_id).first()
-    if not morning:
+    if not morning or morning.user_id != user.id:
         raise HTTPException(status_code=404, detail="Morning check-in not found")
 
-    file_path = AUDIO_DIR / f"morning_{morning_id}_{audio.filename}"
+    # The client-supplied filename is never used to build the path: only its
+    # extension is honoured, and only from an allow-list.
+    suffix = Path(audio.filename or "").suffix.lower()
+    if suffix not in ALLOWED_AUDIO_EXTENSIONS:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported audio format; allowed: {sorted(ALLOWED_AUDIO_EXTENSIONS)}",
+        )
+
+    file_path = AUDIO_DIR / f"morning_{morning_id}{suffix}"
+    written = 0
     with open(file_path, "wb") as f:
-        f.write(await audio.read())
+        while chunk := await audio.read(1024 * 1024):
+            written += len(chunk)
+            if written > MAX_AUDIO_UPLOAD_BYTES:
+                file_path.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail="Audio file too large")
+            f.write(chunk)
 
     try:
         speech_score = _get_speech_scorer().score_audio(file_path)
-    except Exception as e:
+    except Exception:
         speech_score = None
-        print(f"[speech] scoring failed for morning {morning_id}: {e}")
+        logger.exception("speech scoring failed for morning %s", morning_id)
 
     morning.audio_file_path = str(file_path)
     morning.speech_biomarker_score = speech_score
@@ -125,10 +144,19 @@ async def upload_morning_audio(
 # =============================================================================
 
 @router.post("/midday", response_model=MiddayCheckinOut, status_code=status.HTTP_201_CREATED)
-def create_midday_checkin(payload: MiddayCheckinCreate, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == payload.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+def create_midday_checkin(
+    payload: MiddayCheckinCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if payload.morning_checkin_id is not None:
+        morning = (
+            db.query(MorningCheckin)
+            .filter(MorningCheckin.id == payload.morning_checkin_id)
+            .first()
+        )
+        if not morning or morning.user_id != user.id:
+            raise HTTPException(status_code=404, detail="Morning check-in not found")
 
     mc = MiddayCheckin(
         user_id=user.id,
@@ -155,18 +183,16 @@ def create_midday_checkin(payload: MiddayCheckinCreate, db: Session = Depends(ge
 # =============================================================================
 
 @router.post("/evening", response_model=EveningCheckinOut, status_code=status.HTTP_201_CREATED)
-def create_evening_checkin(payload: EveningCheckinCreate, db: Session = Depends(get_db)):
+def create_evening_checkin(
+    payload: EveningCheckinCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     """Core scoring endpoint. Grades the morning image-association test and computes
     the daily cognitive score via the behavioral model."""
-    user = db.query(User).filter(User.id == payload.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
     morning = db.query(MorningCheckin).filter(MorningCheckin.id == payload.morning_checkin_id).first()
-    if not morning:
+    if not morning or morning.user_id != user.id:
         raise HTTPException(status_code=404, detail="Morning check-in not found")
-    if morning.user_id != user.id:
-        raise HTTPException(status_code=403, detail="Morning check-in does not belong to user")
 
     # -------- Grade image-association test --------
     presented = {p["id"]: p for p in morning.presented_associations}
@@ -241,8 +267,8 @@ def create_evening_checkin(payload: EveningCheckinCreate, db: Session = Depends(
 
     try:
         behav_score = _get_behavioral_scorer().score(feats)
-    except Exception as e:
-        print(f"[behav] scoring failed: {e}")
+    except Exception:
+        logger.exception("behavioral scoring failed")
         # Fallback heuristic if model not yet trained
         behav_score = 0.5 * assoc_accuracy + 0.3 * act_recall_accuracy + 0.2 * speech_score
 

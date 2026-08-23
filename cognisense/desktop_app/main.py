@@ -32,15 +32,28 @@ BACKEND_URL = os.getenv("COGNISENSE_BACKEND", "http://127.0.0.1:8000")
 
 # ---------- HTTP helpers ----------
 
+# Bearer token for the logged-in session, set by login/signup.
+_access_token = None
+
+
+def set_access_token(token):
+    global _access_token
+    _access_token = token
+
+
+def _auth_headers():
+    return {"Authorization": f"Bearer {_access_token}"} if _access_token else {}
+
+
 def api_post(path, json=None):
-    r = requests.post(f"{BACKEND_URL}{path}", json=json)
+    r = requests.post(f"{BACKEND_URL}{path}", json=json, headers=_auth_headers(), timeout=30)
     if r.status_code >= 400:
         raise RuntimeError(f"{r.status_code}: {r.text}")
     return r.json()
 
 
 def api_get(path):
-    r = requests.get(f"{BACKEND_URL}{path}")
+    r = requests.get(f"{BACKEND_URL}{path}", headers=_auth_headers(), timeout=30)
     if r.status_code >= 400:
         raise RuntimeError(f"{r.status_code}: {r.text}")
     return r.json()
@@ -111,11 +124,12 @@ class CogniSenseApp(tk.Tk):
 
         def do_login():
             try:
-                user = api_post("/users/login", {
+                auth = api_post("/users/login", {
                     "username": username_e.get(),
                     "password": password_e.get(),
                 })
-                self.current_user = user
+                set_access_token(auth["access_token"])
+                self.current_user = auth["user"]
                 self.show_dashboard()
             except Exception as e:
                 messagebox.showerror("Login failed", str(e))
@@ -165,7 +179,9 @@ class CogniSenseApp(tk.Tk):
                     "wake_time": f"{wake}:00" if len(wake) == 5 else wake,
                     "sleep_time": f"{sleep}:00" if len(sleep) == 5 else sleep,
                 }
-                user = api_post("/users/signup", payload)
+                auth = api_post("/users/signup", payload)
+                set_access_token(auth["access_token"])
+                user = auth["user"]
                 self.current_user = user
                 messagebox.showinfo("Welcome", f"Account created for {user['username']}.")
                 self.show_dashboard()
@@ -197,12 +213,18 @@ class CogniSenseApp(tk.Tk):
             ("Evening check-in",    self.show_evening),
             ("Risk & report",       self.show_report),
             ("Daily suggestions",   self.show_suggestions),
-            ("Log out",             self.show_login),
+            ("Log out",             self.do_logout),
         ]
         for label, cmd in btns:
             ttk.Button(self._container, text=label, command=cmd, width=30).pack(pady=4)
 
         self._disclaimer(self._container)
+
+    def do_logout(self):
+        set_access_token(None)
+        self.current_user = None
+        self.current_morning = None
+        self.show_login()
 
     # ---------- Morning ----------
 
@@ -221,7 +243,6 @@ class CogniSenseApp(tk.Tk):
                 return
             try:
                 morning = api_post("/checkins/morning", {
-                    "user_id": self.current_user["id"],
                     "planned_activities": text,
                 })
                 self.current_morning = morning
@@ -275,7 +296,6 @@ class CogniSenseApp(tk.Tk):
             latency_ms = int((time.time() - start) * 1000)
             try:
                 api_post("/checkins/midday", {
-                    "user_id": self.current_user["id"],
                     "morning_checkin_id": self.current_morning["id"] if self.current_morning else None,
                     "what_user_has_done": done.get("1.0", "end").strip(),
                     "planned_remainder": plan.get("1.0", "end").strip(),
@@ -332,7 +352,6 @@ class CogniSenseApp(tk.Tk):
                 })
             try:
                 ev = api_post("/checkins/evening", {
-                    "user_id": self.current_user["id"],
                     "morning_checkin_id": self.current_morning["id"],
                     "recalled_activities": recalled.get("1.0", "end").strip(),
                     "association_responses": responses,

@@ -15,7 +15,7 @@
     "@react-navigation/native-stack": "^6.11.0",
     "react-native-safe-area-context": "^4.11.0",
     "react-native-screens": "^3.34.0",
-    "react-native-async-storage": "^1.23.1",
+    "@react-native-async-storage/async-storage": "^1.23.1",
     "axios": "^1.7.7"
   },
   "devDependencies": {

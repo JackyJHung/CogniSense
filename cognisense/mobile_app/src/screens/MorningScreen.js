@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
-import { getCurrentUser, morningCheckin } from '../api';
+import { morningCheckin } from '../api';
 import Disclaimer from '../components/Disclaimer';
 
 export default function MorningScreen({ navigation }) {
@@ -13,8 +13,7 @@ export default function MorningScreen({ navigation }) {
       return;
     }
     try {
-      const user = await getCurrentUser();
-      const result = await morningCheckin(user.id, plans);
+      const result = await morningCheckin(plans);
       // Cache morning check-in ID for the evening flow
       global.currentMorning = result;
       setAssociations(result.presented_associations);

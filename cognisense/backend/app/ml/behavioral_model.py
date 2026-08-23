@@ -122,7 +122,7 @@ class BehavioralScorer:
         self.device = torch.device(device)
         self.model = BehavioralBiomarkerMLP().to(self.device)
         if ckpt_path.exists():
-            state = torch.load(ckpt_path, map_location=self.device)
+            state = torch.load(ckpt_path, map_location=self.device, weights_only=True)
             self.model.load_state_dict(state)
         self.model.eval()
 

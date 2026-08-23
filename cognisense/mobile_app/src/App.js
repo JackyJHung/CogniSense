@@ -1,5 +1,5 @@
 // CogniSense mobile root. Screens: Login, Signup, Dashboard, Morning, Midday, Evening, Report, Suggestions.
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -11,10 +11,17 @@ import MiddayScreen from './screens/MiddayScreen';
 import EveningScreen from './screens/EveningScreen';
 import ReportScreen from './screens/ReportScreen';
 import SuggestionsScreen from './screens/SuggestionsScreen';
+import { loadBackendUrl, loadSession } from './api';
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+  useEffect(() => {
+    // Restore the persisted backend URL and bearer token before any request.
+    loadBackendUrl();
+    loadSession();
+  }, []);
+
   return (
     <NavigationContainer>
       <Stack.Navigator
