@@ -1,0 +1,18 @@
+# Local SQLite databases and uploaded audio
+db/
+app/db/
+
+# Trained model checkpoints
+app/ml/checkpoints/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml

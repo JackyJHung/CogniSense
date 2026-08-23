@@ -63,6 +63,16 @@ python -m app.ml.train_models   # Trains demo models on synthetic data
 uvicorn app.main:app --reload
 ```
 
+### Backend tests
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest tests/                                        # unit + API tests
+pytest tests/ --cov=app --cov-report=term-missing     # with coverage
+```
+Tests run against a fresh in-memory SQLite database per test (see
+`tests/conftest.py`), so they never touch `backend/db/`.
+
 ### Desktop app
 ```bash
 cd desktop_app
