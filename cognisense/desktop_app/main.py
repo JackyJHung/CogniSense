@@ -32,18 +32,30 @@ BACKEND_URL = os.getenv("COGNISENSE_BACKEND", "http://127.0.0.1:8000")
 
 # ---------- HTTP helpers ----------
 
-def api_post(path, json=None):
-    r = requests.post(f"{BACKEND_URL}{path}", json=json)
+def _handle_response(r):
     if r.status_code >= 400:
-        raise RuntimeError(f"{r.status_code}: {r.text}")
+        try:
+            detail = r.json().get("detail", r.text)
+        except ValueError:
+            detail = r.text
+        raise RuntimeError(f"{r.status_code}: {detail}")
     return r.json()
+
+
+def api_post(path, json=None):
+    try:
+        r = requests.post(f"{BACKEND_URL}{path}", json=json)
+    except requests.RequestException as e:
+        raise RuntimeError(f"Cannot reach backend at {BACKEND_URL}: {e}") from e
+    return _handle_response(r)
 
 
 def api_get(path):
-    r = requests.get(f"{BACKEND_URL}{path}")
-    if r.status_code >= 400:
-        raise RuntimeError(f"{r.status_code}: {r.text}")
-    return r.json()
+    try:
+        r = requests.get(f"{BACKEND_URL}{path}")
+    except requests.RequestException as e:
+        raise RuntimeError(f"Cannot reach backend at {BACKEND_URL}: {e}") from e
+    return _handle_response(r)
 
 
 # ---------- Main App ----------
