@@ -1,0 +1,9 @@
+.venv/
+db/
+app/db/
+app/ml/checkpoints/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/

@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: ./cognisense/backend
+      target: runtime
+    image: cognisense-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - cognisense-db:/app/db        # SQLite database (backend/db)
+      - cognisense-audio:/app/app/db # uploaded voice samples (backend/app/db/audio)
+    restart: unless-stopped
+
+  # `docker compose run --rm tests` — runs the suite against a throwaway
+  # in-memory database, so it never touches the backend volumes.
+  tests:
+    build:
+      context: ./cognisense/backend
+      target: test
+    image: cognisense-backend-test
+    profiles: ["tests"]
+
+volumes:
+  cognisense-db:
+  cognisense-audio:
