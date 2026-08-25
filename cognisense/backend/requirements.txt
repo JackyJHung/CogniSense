@@ -9,4 +9,5 @@ scikit-learn==1.5.2
 librosa==0.10.2
 python-multipart==0.0.12
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1          # passlib 1.7.4 is incompatible with bcrypt >= 4.1
 python-jose[cryptography]==3.3.0
