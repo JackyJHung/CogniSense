@@ -54,7 +54,28 @@ cognisense/
 
 ## Running the project
 
-### Backend
+### Docker (recommended — same behaviour on macOS, Windows and Linux)
+
+Only Docker Desktop / Docker Engine is required; no Python, PyTorch or audio
+libraries are installed on the host.
+
+```bash
+cd ..                              # docker-compose.yml lives at the repository root
+docker compose up --build          # API on http://localhost:8000 (Swagger UI at /docs)
+docker compose run --rm tests      # unit + API tests with coverage
+docker compose down                # stop; add -v to also delete the data volumes
+```
+
+The image installs the CPU-only PyTorch wheels and trains the demo checkpoints at
+build time, so the first build takes a few minutes; later builds are cached. The
+SQLite database and uploaded voice samples live in named volumes and survive
+`docker compose down`.
+
+The desktop and mobile clients still run on the host — point them at the
+container with `COGNISENSE_BACKEND=http://127.0.0.1:8000` (Android emulator:
+`http://10.0.2.2:8000`).
+
+### Backend (without Docker)
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate
