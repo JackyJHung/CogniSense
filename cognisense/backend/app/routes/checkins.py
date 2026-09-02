@@ -1,6 +1,7 @@
 """Check-in endpoints: morning (plan + image presentation), midday (light recall), evening (recall + test)."""
 
 import json
+import logging
 import random
 from pathlib import Path
 from typing import Optional
@@ -20,6 +21,8 @@ from app.schemas import (
 from app.data.research_benchmarks import NON_DIAGNOSTIC_DISCLAIMER
 from app.ml.behavioral_model import activity_overlap, build_behavioral_feature_vector
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/checkins", tags=["checkins"])
 
@@ -108,16 +111,22 @@ async def upload_morning_audio(
     with open(file_path, "wb") as f:
         f.write(await audio.read())
 
+    speech_score = None
+    scoring_error = None
     try:
         speech_score = _get_speech_scorer().score_audio(file_path)
-    except Exception as e:
-        speech_score = None
-        print(f"[speech] scoring failed for morning {morning_id}: {e}")
+    except Exception:
+        logger.exception("Speech scoring failed for morning check-in %s", morning_id)
+        scoring_error = "Speech scoring unavailable; audio was saved but not scored"
 
     morning.audio_file_path = str(file_path)
     morning.speech_biomarker_score = speech_score
     db.commit()
-    return {"speech_biomarker_score": speech_score, "disclaimer": NON_DIAGNOSTIC_DISCLAIMER}
+    return {
+        "speech_biomarker_score": speech_score,
+        "scoring_error": scoring_error,
+        "disclaimer": NON_DIAGNOSTIC_DISCLAIMER,
+    }
 
 
 # =============================================================================
@@ -129,6 +138,13 @@ def create_midday_checkin(payload: MiddayCheckinCreate, db: Session = Depends(ge
     user = db.query(User).filter(User.id == payload.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if payload.morning_checkin_id is not None:
+        morning = db.query(MorningCheckin).filter(MorningCheckin.id == payload.morning_checkin_id).first()
+        if not morning:
+            raise HTTPException(status_code=404, detail="Morning check-in not found")
+        if morning.user_id != user.id:
+            raise HTTPException(status_code=403, detail="Morning check-in does not belong to user")
 
     mc = MiddayCheckin(
         user_id=user.id,
@@ -241,8 +257,8 @@ def create_evening_checkin(payload: EveningCheckinCreate, db: Session = Depends(
 
     try:
         behav_score = _get_behavioral_scorer().score(feats)
-    except Exception as e:
-        print(f"[behav] scoring failed: {e}")
+    except Exception:
+        logger.exception("Behavioral scoring failed; using heuristic fallback")
         # Fallback heuristic if model not yet trained
         behav_score = 0.5 * assoc_accuracy + 0.3 * act_recall_accuracy + 0.2 * speech_score
 

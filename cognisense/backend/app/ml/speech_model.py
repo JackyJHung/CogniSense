@@ -117,9 +117,13 @@ class SpeechScorer:
     def __init__(self, ckpt_path: Path = SPEECH_CKPT, device: str = "cpu"):
         self.device = torch.device(device)
         self.model = SpeechBiomarkerCNN().to(self.device)
-        if ckpt_path.exists():
-            state = torch.load(ckpt_path, map_location=self.device)
-            self.model.load_state_dict(state)
+        if not ckpt_path.exists():
+            raise FileNotFoundError(
+                f"Speech model checkpoint not found at {ckpt_path}; "
+                "run `python -m app.ml.train_models` to create it"
+            )
+        state = torch.load(ckpt_path, map_location=self.device)
+        self.model.load_state_dict(state)
         self.model.eval()
 
     @torch.no_grad()

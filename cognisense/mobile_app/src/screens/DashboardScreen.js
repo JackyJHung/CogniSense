@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet } from 'react-native';
+import { View, Text, Button, StyleSheet, Alert } from 'react-native';
 import { getCurrentUser, logout } from '../api';
 import Disclaimer from '../components/Disclaimer';
 
@@ -7,8 +7,19 @@ export default function DashboardScreen({ navigation }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    getCurrentUser().then(setUser);
-  }, []);
+    getCurrentUser()
+      .then((u) => {
+        if (u) {
+          setUser(u);
+        } else {
+          navigation.replace('Login');
+        }
+      })
+      .catch((e) => {
+        Alert.alert('Error', e.message);
+        navigation.replace('Login');
+      });
+  }, [navigation]);
 
   if (!user) return <Text style={{ padding: 20 }}>Loading...</Text>;
 

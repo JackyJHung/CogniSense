@@ -43,7 +43,14 @@ export async function login(username, password) {
 
 export async function getCurrentUser() {
   const raw = await AsyncStorage.getItem('currentUser');
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    console.warn('Stored currentUser is corrupt; clearing it', e);
+    await AsyncStorage.removeItem('currentUser');
+    return null;
+  }
 }
 
 export async function logout() {

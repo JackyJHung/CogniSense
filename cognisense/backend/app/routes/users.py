@@ -1,6 +1,7 @@
 """User-management endpoints: signup, login, profile lookup."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
@@ -30,7 +31,11 @@ def signup(payload: UserCreate, db: Session = Depends(get_db)):
         sleep_time=payload.sleep_time,
     )
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Username already taken")
     db.refresh(user)
     return user
 
