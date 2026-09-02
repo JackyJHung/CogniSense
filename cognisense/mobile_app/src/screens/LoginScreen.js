@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import { login } from '../api';
+import { showApiError } from '../utils';
 import Disclaimer from '../components/Disclaimer';
 
 export default function LoginScreen({ navigation }) {
@@ -12,7 +13,7 @@ export default function LoginScreen({ navigation }) {
       await login(username, password);
       navigation.replace('Dashboard');
     } catch (e) {
-      Alert.alert('Login failed', e?.response?.data?.detail ?? e.message);
+      showApiError(e, 'Login failed');
     }
   };
 

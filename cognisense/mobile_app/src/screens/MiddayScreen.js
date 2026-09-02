@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
 import { getCurrentUser, middayCheckin } from '../api';
+import { showApiError } from '../utils';
 import Disclaimer from '../components/Disclaimer';
 
 export default function MiddayScreen({ navigation }) {
@@ -22,7 +23,7 @@ export default function MiddayScreen({ navigation }) {
         { text: 'OK', onPress: () => navigation.navigate('Dashboard') },
       ]);
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.detail ?? e.message);
+      showApiError(e);
     }
   };
 

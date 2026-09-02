@@ -18,10 +18,14 @@ Run:
 """
 
 from __future__ import annotations
+from pathlib import Path
+
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+
+from app.ml.inference import normalize_array
 
 from app.ml.speech_model import (
     SpeechBiomarkerCNN,
@@ -31,7 +35,6 @@ from app.ml.speech_model import (
 )
 from app.ml.behavioral_model import (
     BehavioralBiomarkerMLP,
-    BEHAV_FEATURES,
     BEHAV_CKPT,
 )
 
@@ -42,6 +45,42 @@ SEED = 42
 def set_seed(seed: int = SEED):
     np.random.seed(seed)
     torch.manual_seed(seed)
+
+
+def train_binary_classifier(
+    model: nn.Module,
+    X: np.ndarray,
+    y: np.ndarray,
+    epochs: int,
+    batch_size: int,
+    ckpt_path: Path,
+    tag: str,
+    log_every: int = 1,
+):
+    """Train a binary classifier with BCE loss and save its checkpoint."""
+    ds = TensorDataset(torch.from_numpy(X), torch.from_numpy(y))
+    dl = DataLoader(ds, batch_size=batch_size, shuffle=True)
+
+    opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+    loss_fn = nn.BCEWithLogitsLoss()
+
+    for epoch in range(epochs):
+        total, correct, losses = 0, 0, []
+        for xb, yb in dl:
+            opt.zero_grad()
+            logits = model(xb).squeeze(-1)
+            loss = loss_fn(logits, yb)
+            loss.backward()
+            opt.step()
+            losses.append(loss.item())
+            preds = (torch.sigmoid(logits) > 0.5).float()
+            correct += (preds == yb).sum().item()
+            total += len(yb)
+        if (epoch + 1) % log_every == 0 or epoch == 0:
+            print(f"[{tag}] epoch {epoch+1}: loss={np.mean(losses):.4f} acc={correct/total:.3f}")
+
+    torch.save(model.state_dict(), ckpt_path)
+    print(f"[{tag}] saved checkpoint -> {ckpt_path}")
 
 
 # -----------------------------------------------------------------------------
@@ -72,7 +111,7 @@ def make_speech_dataset(n_per_class: int = 800):
                 noise = rng.normal(0, 0.9, size=bands.shape)
                 dropout_mask = (rng.rand(*bands.shape) > 0.15).astype(np.float32)
                 mfcc = (bands * dropout_mask) + noise
-            mfcc = (mfcc - mfcc.mean()) / (mfcc.std() + 1e-8)
+            mfcc = normalize_array(mfcc)
             X.append(mfcc.astype(np.float32))
             y.append(cls)
 
@@ -85,29 +124,9 @@ def make_speech_dataset(n_per_class: int = 800):
 def train_speech_model(epochs: int = 6, batch_size: int = 32):
     set_seed()
     X, y = make_speech_dataset()
-    ds = TensorDataset(torch.from_numpy(X), torch.from_numpy(y))
-    dl = DataLoader(ds, batch_size=batch_size, shuffle=True)
-
-    model = SpeechBiomarkerCNN()
-    opt = torch.optim.Adam(model.parameters(), lr=1e-3)
-    loss_fn = nn.BCEWithLogitsLoss()
-
-    for epoch in range(epochs):
-        total, correct, losses = 0, 0, []
-        for xb, yb in dl:
-            opt.zero_grad()
-            logits = model(xb).squeeze(-1)
-            loss = loss_fn(logits, yb)
-            loss.backward()
-            opt.step()
-            losses.append(loss.item())
-            preds = (torch.sigmoid(logits) > 0.5).float()
-            correct += (preds == yb).sum().item()
-            total += len(yb)
-        print(f"[speech] epoch {epoch+1}: loss={np.mean(losses):.4f} acc={correct/total:.3f}")
-
-    torch.save(model.state_dict(), SPEECH_CKPT)
-    print(f"[speech] saved checkpoint -> {SPEECH_CKPT}")
+    train_binary_classifier(
+        SpeechBiomarkerCNN(), X, y, epochs, batch_size, SPEECH_CKPT, tag="speech",
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -162,30 +181,10 @@ def make_behavioral_dataset(n_per_class: int = 1500):
 def train_behavioral_model(epochs: int = 30, batch_size: int = 64):
     set_seed()
     X, y = make_behavioral_dataset()
-    ds = TensorDataset(torch.from_numpy(X), torch.from_numpy(y))
-    dl = DataLoader(ds, batch_size=batch_size, shuffle=True)
-
-    model = BehavioralBiomarkerMLP()
-    opt = torch.optim.Adam(model.parameters(), lr=1e-3)
-    loss_fn = nn.BCEWithLogitsLoss()
-
-    for epoch in range(epochs):
-        total, correct, losses = 0, 0, []
-        for xb, yb in dl:
-            opt.zero_grad()
-            logits = model(xb).squeeze(-1)
-            loss = loss_fn(logits, yb)
-            loss.backward()
-            opt.step()
-            losses.append(loss.item())
-            preds = (torch.sigmoid(logits) > 0.5).float()
-            correct += (preds == yb).sum().item()
-            total += len(yb)
-        if (epoch + 1) % 5 == 0 or epoch == 0:
-            print(f"[behav]  epoch {epoch+1}: loss={np.mean(losses):.4f} acc={correct/total:.3f}")
-
-    torch.save(model.state_dict(), BEHAV_CKPT)
-    print(f"[behav]  saved checkpoint -> {BEHAV_CKPT}")
+    train_binary_classifier(
+        BehavioralBiomarkerMLP(), X, y, epochs, batch_size, BEHAV_CKPT,
+        tag="behav", log_every=5,
+    )
 
 
 def main():

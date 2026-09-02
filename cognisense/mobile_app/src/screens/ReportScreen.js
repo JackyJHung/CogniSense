@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, ScrollView, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, Button, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { getCurrentUser, getRiskComparison } from '../api';
+import { showApiError } from '../utils';
 import Disclaimer from '../components/Disclaimer';
 
 export default function ReportScreen({ navigation }) {
@@ -14,7 +15,7 @@ export default function ReportScreen({ navigation }) {
         const rc = await getRiskComparison(user.id);
         setData(rc);
       } catch (e) {
-        Alert.alert('Error', e?.response?.data?.detail ?? e.message);
+        showApiError(e);
       } finally {
         setLoading(false);
       }
