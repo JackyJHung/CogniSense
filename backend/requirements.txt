@@ -1,5 +1,6 @@
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
+gunicorn==23.0.0  # process manager the Dockerfile CMD runs (UvicornWorker)
 pydantic==2.9.2
 sqlalchemy==2.0.36
 torch==2.5.1

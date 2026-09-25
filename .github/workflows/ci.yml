@@ -1,0 +1,146 @@
+# CogniSense CI
+#
+# Three jobs, one question each:
+#   backend  do the API tests pass, and do the models still pass their
+#            negative controls under user-level nested CV?
+#   web      does the React client type-check and build?
+#   docker   does the production image build, boot under a production config,
+#            and answer /health?
+#
+# The docker job is the one that matters most for deployment: it runs the image
+# exactly as docker-compose does, so a missing runtime dependency or a config
+# the server refuses fails here instead of on the VM.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests + model validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      COGNISENSE_DISABLE_SCHEDULER: "1"
+      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: System libraries for audio
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libsndfile1 ffmpeg
+
+      # CPU torch first, from the CPU index, same as the Dockerfile. The default
+      # PyPI wheel bundles CUDA and costs minutes of download for nothing.
+      - name: Install dependencies
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.5.1" "torchaudio==2.5.1"
+          pip install -r requirements-dev.txt
+
+      # Checkpoints are gitignored, so a clean checkout has none. Train the demo
+      # models so the tests exercise the real scoring path, not the fallback.
+      - name: Train demo models (synthetic data)
+        run: python -m app.ml.train_models
+
+      - name: Tests
+        run: python -m pytest tests -q
+
+      # Nested CV + permuted-label, baseline and confound controls. A failed
+      # control exits non-zero and fails the build.
+      - name: Model validation harness
+        run: python -m app.ml.validate
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: backend/results/
+          if-no-files-found: ignore
+
+  web:
+    name: Web client build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web_app/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  docker:
+    name: Docker image build + smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: [backend, web]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: cognisense:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Boot with COGNISENSE_ENV=production (baked into the image) and the
+      # minimum valid production config. config.validate() refuses to start on
+      # anything unsafe, so reaching /health proves the image is deployable.
+      - name: Start container
+        run: |
+          docker run -d --name cognisense -p 127.0.0.1:8000:8000 \
+            -e COGNISENSE_ALLOWED_ORIGINS=https://ci.cognisense.dev \
+            -e COGNISENSE_PUBLIC_URL=https://ci.cognisense.dev \
+            -e COGNISENSE_VAPID_SUBJECT=mailto:ci@cognisense.dev \
+            -e COGNISENSE_DISABLE_SCHEDULER=1 \
+            cognisense:ci
+
+      - name: Wait for /health
+        run: |
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8000/health; then
+              echo; echo "healthy after ~$((i * 2))s"; exit 0
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' cognisense)" != "true" ]; then
+              echo "container exited"; break
+            fi
+            sleep 2
+          done
+          echo "::error::container never became healthy"
+          exit 1
+
+      - name: Frontend is served from the same origin
+        run: curl -fsS http://127.0.0.1:8000/index.html | grep -qi '<div id="root"'
+
+      - name: Container logs
+        if: always()
+        run: docker logs cognisense || true
