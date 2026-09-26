@@ -1,11 +1,12 @@
 """FastAPI entry point for CogniSense backend."""
 
 import logging
+import mimetypes
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import config
@@ -89,13 +90,28 @@ app.include_router(recovery.router)
 
 
 @app.get("/")
-def root():
-    return {
-        "name": "CogniSense API",
-        "version": "0.1.0",
-        "status": "ok",
-        "disclaimer": NON_DIAGNOSTIC_DISCLAIMER,
-    }
+def root(request: Request):
+    """The site root: the app for a browser, a JSON banner for anything else.
+
+    In production the frontend is served from this same origin, and this route
+    is registered before the SPA fallback below -- so without the check, anyone
+    opening the bare domain, and the installed web app (start_url "/"), got
+    this JSON instead of the app. A browser navigation asks for text/html; API
+    clients and scripts do not. `Vary: Accept` stops a cache between here and
+    the user from handing one kind of caller the other kind's answer.
+    """
+    headers = {"Vary": "Accept"}
+    if _DIST.is_dir() and "text/html" in request.headers.get("accept", ""):
+        return FileResponse(_DIST / "index.html", headers=headers)
+    return JSONResponse(
+        {
+            "name": "CogniSense API",
+            "version": "0.1.0",
+            "status": "ok",
+            "disclaimer": NON_DIAGNOSTIC_DISCLAIMER,
+        },
+        headers=headers,
+    )
 
 
 @app.get("/health")
@@ -115,6 +131,12 @@ def health():
 # cannot shadow a POST endpoint.
 # ---------------------------------------------------------------------------
 _DIST = Path(__file__).resolve().parents[2] / "web_app" / "dist"
+
+# FileResponse types files by extension through `mimetypes`, whose table varies
+# with the Python version and whatever the host OS registers. Pinned so the
+# manifest that makes the app installable is served as what it is everywhere,
+# including the slim production image.
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 if _DIST.is_dir():
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")

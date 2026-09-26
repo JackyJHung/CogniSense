@@ -164,14 +164,14 @@ def due_reminders(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_self),
 ):
-    """Outstanding items that are due now. Drives the client's pop-up.
+    """Outstanding items that are due now.
 
     Items with no due date are always considered due, so a user who never sets
     times still gets checked.
 
-    NOTE: the actual notification is a client concern -- a server cannot raise
-    a pop-up. React Native schedules a local notification; the web client polls
-    this endpoint. Nothing here pushes.
+    NOTE: this only answers the question; it prompts nobody. Prompting happens
+    through Web Push -- app/notifications/scheduler.py applies the same "due"
+    rule and sends a notification that deliberately does not name the items.
     """
     now = datetime.now(timezone.utc)
     return (

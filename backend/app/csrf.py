@@ -34,7 +34,7 @@ module exists to close -- but to stop being cross-origin: Vite proxies /api to
 the backend, so the browser sees one origin. See web_app/vite.config.ts.
 
 NATIVE CLIENTS ARE UNAFFECTED
-The desktop and mobile clients send `Authorization: Bearer`. A header is never
+The desktop client sends `Authorization: Bearer`. A header is never
 attached automatically by a browser, so header-authenticated requests are immune
 to CSRF by construction and are skipped by this middleware.
 """

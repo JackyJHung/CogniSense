@@ -294,7 +294,7 @@ def test_bearer_auth_needs_no_csrf_token(env):
     """Native clients send a header, which a browser never attaches for them.
 
     Header-authenticated requests are immune to CSRF by construction, so
-    requiring a token would break the desktop and mobile apps for no gain.
+    requiring a token would break the desktop app for no gain.
     """
     client, db = env
     token = create_session(db, db.query(User).get(1))

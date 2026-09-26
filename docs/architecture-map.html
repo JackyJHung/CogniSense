@@ -348,7 +348,6 @@
     <div class="clients-row">
       <div class="node client"><div class="title">web_app</div><div class="desc">React + Vite + Tailwind v4 + Framer Motion · :5173</div></div>
       <div class="node client"><div class="title">desktop_app</div><div class="desc">Tkinter (stdlib) · Python-only</div></div>
-      <div class="node client"><div class="title">mobile_app</div><div class="desc">React Native (scaffold)</div></div>
     </div>
     <div class="arrows">↓ HTTP / JSON · CORS open ↓</div>
     <div class="backend-row">
@@ -400,12 +399,11 @@
   "name": "CogniSense",
   "version": "0.1.0",
   "generated_at": "2026-05-18",
-  "description": "Early-risk screening for Alzheimer's & related dementias via speech + behavioral biomarkers. Shared FastAPI + PyTorch backend; three independent clients (Tkinter desktop, React web, React Native mobile scaffold).",
+  "description": "Early-risk screening for Alzheimer's & related dementias via speech + behavioral biomarkers. Shared FastAPI + PyTorch backend; two clients (React web, installable to a phone's Home Screen as a PWA; Tkinter desktop).",
   "tech_stack": {
     "backend": ["Python 3.12", "FastAPI 0.115", "SQLAlchemy 2.0", "Pydantic v2", "PyTorch 2.5", "librosa", "SQLite"],
     "web_app": ["React 19", "TypeScript", "Vite 8", "Tailwind CSS v4", "Framer Motion", "React Router", "lucide-react"],
-    "desktop_app": ["Python 3.12", "Tkinter (stdlib)", "requests"],
-    "mobile_app": ["React Native (scaffold)"]
+    "desktop_app": ["Python 3.12", "Tkinter (stdlib)", "requests"]
   },
   "services": [
     {
@@ -467,25 +465,6 @@
       "entry": "desktop_app/main.py",
       "modules": [
         { "id": "main", "file": "desktop_app/main.py", "role": "Single-file Tk root with screens: login, signup, dashboard, morning, midday, evening, report, suggestions" }
-      ]
-    },
-    {
-      "id": "mobile_app",
-      "path": "mobile_app/",
-      "role": "React Native scaffold for Android + iOS. Not yet fully wired against the latest backend changes.",
-      "entry": "mobile_app/src/App.js",
-      "modules": [
-        { "id": "App",                  "file": "mobile_app/src/App.js" },
-        { "id": "api",                  "file": "mobile_app/src/api.js" },
-        { "id": "components.Disclaimer","file": "mobile_app/src/components/Disclaimer.js" },
-        { "id": "screens.Login",        "file": "mobile_app/src/screens/LoginScreen.js" },
-        { "id": "screens.Signup",       "file": "mobile_app/src/screens/SignupScreen.js" },
-        { "id": "screens.Dashboard",    "file": "mobile_app/src/screens/DashboardScreen.js" },
-        { "id": "screens.Morning",      "file": "mobile_app/src/screens/MorningScreen.js" },
-        { "id": "screens.Midday",       "file": "mobile_app/src/screens/MiddayScreen.js" },
-        { "id": "screens.Evening",      "file": "mobile_app/src/screens/EveningScreen.js" },
-        { "id": "screens.Report",       "file": "mobile_app/src/screens/ReportScreen.js" },
-        { "id": "screens.Suggestions",  "file": "mobile_app/src/screens/SuggestionsScreen.js" }
       ]
     }
   ],

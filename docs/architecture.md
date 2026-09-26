@@ -2,17 +2,17 @@
 
 ## Why a shared backend
 
-CogniSense supports three clients (desktop Tkinter, Android, iOS). All business logic, ML models, the database, and the risk-comparison engine live in **one place**: the FastAPI backend. Each client is a thin UI layer that calls the backend over HTTP.
+CogniSense has two clients: a React web app, which phones install to the Home Screen as a PWA, and a Tkinter desktop app. All business logic, ML models, the database, and the risk-comparison engine live in **one place**: the FastAPI backend. Each client is a thin UI layer that calls the backend over HTTP.
 
 Benefits:
-- Retraining models or updating benchmarks updates all platforms at once.
+- Retraining models or updating benchmarks updates every client at once.
 - The research-benchmark constants are defined once and cited once.
-- Adding a web client later is trivial — it's just another HTTP caller.
+- A new client is just another HTTP caller.
 
 ## Request flow (evening check-in)
 
 ```
-   [Desktop / iOS / Android]
+   [Web app / Desktop app]
            |
            |  POST /checkins/evening
            |  { user_id, morning_checkin_id, recalled_activities, association_responses[] }
@@ -94,7 +94,7 @@ Benefits:
 
 ## Safety layer
 
-Every response body in every endpoint carries the `NON_DIAGNOSTIC_DISCLAIMER` string, defined once in `app/data/research_benchmarks.py`. The UI components on each platform render it consistently (`Disclaimer` component on mobile, `_disclaimer()` helper on desktop). This prevents any single screen from silently dropping the disclaimer.
+Every response body in every endpoint carries the `NON_DIAGNOSTIC_DISCLAIMER` string, defined once in `app/data/research_benchmarks.py`. The UI components on each platform render it consistently (`Disclaimer` component on the web, `_disclaimer()` helper on desktop). This prevents any single screen from silently dropping the disclaimer.
 
 ## File map
 
@@ -106,12 +106,12 @@ Every response body in every endpoint carries the `NON_DIAGNOSTIC_DISCLAIMER` st
 - `backend/app/models/` — SQLAlchemy ORM models
 - `backend/app/routes/` — FastAPI routers (users, checkins, reports)
 - `backend/app/main.py` — FastAPI entry point
-- `desktop_app/main.py` — Tkinter desktop client
-- `mobile_app/src/` — React Native client (iOS + Android)
+- `desktop_app/main.py` — Tkinter desktop client; `api_client.py` holds its session
+- `web_app/src/` — React web client; `public/manifest.webmanifest` and `public/sw.js` make it installable and let it receive push
 
 ## Phase 2 hooks (already stubbed)
 
 - `models/checkin.py` captures `association_responses` JSON and `avg_response_latency_ms` — ready for trend charting.
 - `routes/reports.py#get_trend` returns time-series data — ready to pipe into a Recharts component or matplotlib.
 - `data/research_benchmarks.py#LANCET_2024_RISK_FACTORS` has population-attributable fractions per factor — ready to rank personalized suggestions by expected benefit.
-- Alarm-lock: add an endpoint `GET /alarm-lock/{user_id}` returning `{unlocked: bool}` that toggles based on whether today's morning check-in has been completed. Mobile clients can integrate with OS lockscreen APIs.
+- Alarm-lock: add an endpoint `GET /alarm-lock/{user_id}` returning `{unlocked: bool}` that toggles based on whether today's morning check-in has been completed. Enforcing it needs a native app: a web app, installed or not, cannot touch the OS lock screen.

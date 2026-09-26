@@ -58,7 +58,6 @@ backend/tests/
 backend/results/
 docs/
 desktop_app/
-mobile_app/
 **/README.md
 !README.md
 **/*.log

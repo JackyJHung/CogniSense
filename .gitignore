@@ -80,16 +80,11 @@ backend/app/ml/checkpoints/
 # `git add -f` if you want to pin one to a claim you are making.
 backend/results/
 
-# === Node / React (web_app + mobile_app) ====================================
+# === Node / React (web_app) =================================================
 node_modules/
 web_app/node_modules/
 web_app/dist/
 web_app/.vite/
-mobile_app/node_modules/
-mobile_app/android/build/
-mobile_app/android/app/build/
-mobile_app/ios/build/
-mobile_app/ios/Pods/
 *.log
 npm-debug.log*
 yarn-debug.log*

@@ -109,7 +109,7 @@ def _token_from_header(authorization: str | None) -> str | None:
 def session_token_from(request: Request, authorization: str | None) -> str | None:
     """Two accepted transports, checked in that order.
 
-    The header wins so a native client (desktop, mobile) is unaffected by
+    The header wins so a native client (the desktop app) is unaffected by
     whatever cookies a shared browser session happens to hold. Browsers use the
     HttpOnly cookie, which script cannot read -- see app/csrf.py.
     """

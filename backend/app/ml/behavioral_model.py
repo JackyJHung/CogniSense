@@ -16,8 +16,9 @@ distribution):
   6. checkin_consistency                -- fraction of 3 daily check-ins completed
   7. speech_biomarker_score             -- from the speech model, 0..1
 
-The model is a small MLP; it trains quickly and runs on CPU which suits both
-desktop and mobile deployments.
+The model is a small MLP; it trains quickly and runs on CPU, which suits the
+small GPU-less server it is deployed on. Inference is server-side: no client
+ever loads it.
 """
 
 from __future__ import annotations

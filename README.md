@@ -6,8 +6,9 @@ AI/ML application for early-risk screening of Alzheimer's disease and related de
 
 ## Architecture
 
-A **shared Python/PyTorch backend** (FastAPI + SQLite) serves three independent
-clients, and everything that produces a number goes through a shared methodology
+A **shared Python/PyTorch backend** (FastAPI + SQLite) serves two independent
+clients — a web app that installs to a phone's Home Screen, and a Tkinter desktop
+app — and everything that produces a number goes through a shared methodology
 layer in `core/`.
 
 ```
@@ -39,8 +40,7 @@ cognisense-app/
 │   ├── tests/
 │   └── requirements.txt
 ├── desktop_app/         # Python-only Tkinter desktop client (stdlib UI)
-├── web_app/             # React + Vite + Tailwind + Framer Motion web client
-├── mobile_app/          # React Native cross-platform (iOS + Android) scaffold
+├── web_app/             # React + Vite + Tailwind web client; installable (PWA)
 └── docs/                # Data sources, model cards, architecture notes
 ```
 
@@ -142,12 +142,18 @@ another device — the next action returns to the login screen and says why.
 All HTTP goes through `desktop_app/api_client.py`, which
 `backend/tests/test_desktop_client.py` drives against the real API.
 
-### Mobile app
-```bash
-cd mobile_app
-npm install
-npx react-native run-android   # or run-ios
-```
+### On a phone: install the web app
+There is no separate mobile app. The web client ships a manifest
+(`web_app/public/manifest.webmanifest`) and icons, so it installs to the Home
+Screen and opens full-screen like a native app. Installing needs HTTPS — a
+deployed server; `localhost` also counts, for development.
+
+- **iPhone / iPad (Safari):** Share → **Add to Home Screen**. On iOS this is
+  what makes reminders possible at all: Safari delivers web push only to a web
+  app on the Home Screen (iOS 16.4+), so turn notifications on from inside the
+  installed app.
+- **Android (Chrome):** menu → **Install app**, or accept the install prompt.
+- **Desktop (Chrome, Edge):** the install button in the address bar.
 
 ## Validating the models
 
@@ -250,8 +256,9 @@ the credential stayed valid indefinitely. `POST /users/logout` with
 ### Where the session lives
 
 Browsers get an **HttpOnly cookie** — script cannot read it, so an XSS on the
-origin can no longer walk off with a 30-day credential. Native clients (desktop,
-mobile) keep using `Authorization: Bearer`, since they have no cookie jar.
+origin can no longer walk off with a 30-day credential. The native client, the
+desktop app, keeps using `Authorization: Bearer`: its HTTP session refuses
+cookies, so the token is the only credential it ever sends.
 
 A cookie is attached automatically, which is CSRF. Three layers answer that:
 
@@ -456,7 +463,8 @@ answer is not "always":
 | State | Notification arrives? |
 |---|---|
 | Tab closed | Yes — the service worker is woken by the push service |
-| Browser closed, phone | Yes on Android; iOS needs the PWA added to the Home Screen (16.4+) |
+| Browser closed, Android | Yes |
+| iPhone / iPad | Only from the installed web app: Safari → Share → **Add to Home Screen** (iOS 16.4+), then turn notifications on inside it — see [installing on a phone](#on-a-phone-install-the-web-app) |
 | Browser closed, desktop | Only if the browser keeps a background process (Chrome: Settings → System → "Continue running background apps") |
 | Backend stopped | No — the scheduler *is* the sender |
 

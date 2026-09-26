@@ -42,8 +42,12 @@ self.addEventListener("push", (event) => {
     // Same tag replaces an earlier unread prompt instead of stacking up.
     tag: data.tag || "cognisense-reminder-check",
     renotify: false,
-    icon: "/favicon.svg",
-    badge: "/favicon.svg",
+    // PNG, not the SVG favicon: not every platform renders SVG notification
+    // icons. The badge is the glyph alone, white on transparent, because
+    // Android draws it in the status bar from its alpha channel only -- a
+    // full-colour icon there shows as a solid white square.
+    icon: "/icon-192.png",
+    badge: "/badge-96.png",
     data: { url: data.url || DEFAULT_URL },
   };
 

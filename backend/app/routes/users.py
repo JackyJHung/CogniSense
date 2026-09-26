@@ -5,7 +5,7 @@ why that ordering is the difference between a rate limit and a DoS amplifier.
 
 Sessions are delivered two ways from the same code path: an HttpOnly cookie for
 browsers (script cannot read it) and a bearer token in the response body for the
-desktop and mobile clients, which have no cookie jar. See app/csrf.py.
+desktop client, which keeps no cookies. See app/csrf.py.
 """
 
 from datetime import datetime, timedelta, timezone
