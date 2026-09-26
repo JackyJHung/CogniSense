@@ -233,7 +233,8 @@ export interface EveningCheckin {
 }
 
 export interface RiskComparison {
-  user_recent_avg_score: number;
+  /** null when the period has no scored days -- never a made-up 0. */
+  user_recent_avg_score: number | null;
   /** 95% bootstrap interval on the recent average. null when there are too few
    *  scored days to estimate one — render that as "not enough data yet", never
    *  as a precise figure. */
@@ -260,6 +261,46 @@ export interface RiskComparison {
 
   suggestions: string[];
   citations: string[];
+  disclaimer: string;
+}
+
+/** One local calendar day of GET /reports/trend. */
+export interface TrendPoint {
+  /** YYYY-MM-DD in the user's own time zone. */
+  date: string;
+  /** The day's first evening check-in; null = no check-in (a gap, not a zero). */
+  score: number | null;
+  /** More than 1 means retakes, which do not count. */
+  attempts: number;
+  /** Trailing mean and its 95% interval; the interval is null below 3 days. */
+  rolling_mean: number | null;
+  rolling_ci_low: number | null;
+  rolling_ci_high: number | null;
+  rolling_scored_days: number;
+}
+
+/** The daily series plus the same trajectory the risk report computes, so for
+ *  the same window the chart and the report cannot disagree. */
+export interface Trend {
+  window_days: number;
+  timezone: string;
+  rolling_days: number;
+  points: TrendPoint[];
+  n_scored_days: number;
+  recent_avg: number | null;
+  recent_avg_ci_low: number | null;
+  recent_avg_ci_high: number | null;
+  baseline_avg: number | null;
+  baseline_ci_low: number | null;
+  baseline_ci_high: number | null;
+  baseline_days: number;
+  change_pct: number | null;
+  change_ci_low_pct: number | null;
+  change_ci_high_pct: number | null;
+  elevated_concern: boolean;
+  concern_reason: string | null;
+  inconclusive: boolean;
+  inconclusive_reason: string | null;
   disclaimer: string;
 }
 

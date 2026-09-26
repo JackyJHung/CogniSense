@@ -112,6 +112,5 @@ Every response body in every endpoint carries the `NON_DIAGNOSTIC_DISCLAIMER` st
 ## Phase 2 hooks (already stubbed)
 
 - `models/checkin.py` captures `association_responses` JSON and `avg_response_latency_ms` — ready for trend charting.
-- `routes/reports.py#get_trend` returns time-series data — ready to pipe into a Recharts component or matplotlib.
 - `data/research_benchmarks.py#LANCET_2024_RISK_FACTORS` has population-attributable fractions per factor — ready to rank personalized suggestions by expected benefit.
 - Alarm-lock: add an endpoint `GET /alarm-lock/{user_id}` returning `{unlocked: bool}` that toggles based on whether today's morning check-in has been completed. Enforcing it needs a native app: a web app, installed or not, cannot touch the OS lock screen.

@@ -498,14 +498,17 @@ class CogniSenseApp(tk.Tk):
         # Every number carries its interval, and too few days is said plainly
         # rather than shown as a precise-looking score.
         n = rc.get("n_scored_days", 0)
+        avg = rc.get("user_recent_avg_score")
         lo, hi = rc.get("user_recent_avg_ci_low"), rc.get("user_recent_avg_ci_high")
-        if lo is not None and hi is not None:
+        if avg is None:
+            spread = "no scored days in this period yet"
+        elif lo is not None and hi is not None:
             spread = f"95% range {lo:.2f}–{hi:.2f}, {n} scored days"
         else:
             spread = f"{n} scored day{'' if n == 1 else 's'} — too few to give a range yet"
 
         summary = (
-            f"Your recent average daily score:  {rc['user_recent_avg_score']:.2f}  ({spread})\n"
+            f"Your recent average daily score:  {'—' if avg is None else f'{avg:.2f}'}  ({spread})\n"
             f"Peer expected prevalence (age+gender+race):  {rc['peer_expected_prevalence_pct']:.1f}%\n"
             f"Peer subjective cognitive decline rate:      {rc['scd_peer_prevalence_pct']:.1f}%\n"
         )

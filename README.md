@@ -537,7 +537,6 @@ database of its own.
 - **Notifications need the backend running.** There is no delivery when the
   server is stopped — see the table above. A always-on host, or a native
   scheduled task, is what removes that constraint.
-- Biweekly / monthly longitudinal reports with trend charts
 - Attention warning triggered by sustained deviation from benchmarks
 - Alarm-lock mode (phone unlocks only on check-in completion)
 - Research-backed daily activity recommendations driven by the 14 Lancet 2024 modifiable risk factors

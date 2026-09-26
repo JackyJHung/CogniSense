@@ -6,6 +6,7 @@ import { Shell } from "@/components/Shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Disclaimer } from "@/components/Disclaimer";
+import { TrendReport } from "@/components/TrendReport";
 import { api, type RiskComparison } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
@@ -47,15 +48,21 @@ export function ReportPage() {
           <div className="grid gap-4 sm:grid-cols-3">
             <Metric
               label="Your recent average score"
-              value={`${Math.round(data.user_recent_avg_score * 100)}%`}
+              value={
+                data.user_recent_avg_score == null
+                  ? "—"
+                  : `${Math.round(data.user_recent_avg_score * 100)}%`
+              }
               hint={
-                data.user_recent_avg_ci_low != null && data.user_recent_avg_ci_high != null
-                  ? `95% range ${Math.round(data.user_recent_avg_ci_low * 100)}–${Math.round(
-                      data.user_recent_avg_ci_high * 100,
-                    )}% · ${data.n_scored_days} scored days`
-                  : `${data.n_scored_days} scored day${
-                      data.n_scored_days === 1 ? "" : "s"
-                    } — too few to give a range yet`
+                data.user_recent_avg_score == null
+                  ? "no scored days in the last 14 yet"
+                  : data.user_recent_avg_ci_low != null && data.user_recent_avg_ci_high != null
+                    ? `95% range ${Math.round(data.user_recent_avg_ci_low * 100)}–${Math.round(
+                        data.user_recent_avg_ci_high * 100,
+                      )}% · ${data.n_scored_days} scored days`
+                    : `${data.n_scored_days} scored day${
+                        data.n_scored_days === 1 ? "" : "s"
+                      } — too few to give a range yet`
               }
             />
             <Metric
@@ -137,6 +144,8 @@ export function ReportPage() {
               </Card>
             </motion.div>
           )}
+
+          <TrendReport userId={user.id} />
 
           <Card>
             <CardHeader>

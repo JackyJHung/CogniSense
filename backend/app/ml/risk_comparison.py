@@ -95,8 +95,11 @@ def analyze_trajectory(
     random_state: int = 42,
 ) -> TrajectoryResult:
     """
-    recent_scores: last ~7 daily cognitive scores (0..1)
-    baseline_scores: user's earliest ~7-14 daily scores (0..1)
+    recent_scores: one score per day in the period being judged (0..1)
+    baseline_scores: the user's earliest scored days before that period, up to
+        14 (0..1). May be empty -- then there is nothing to compare with, and
+        the answer is inconclusive; never pass the recent scores in its place.
+    total_checkins: days with a scored check-in, all time.
 
     Returns a TrajectoryResult whose `elevated_concern` flag is only set when
     the evidence supports it -- see the module docstring.
@@ -117,12 +120,41 @@ def analyze_trajectory(
     inconclusive = False
     inconclusive_reason: Optional[str] = None
 
+    # Whole interval below the floor, not just the midpoint. Needs no baseline.
+    real_floor = (
+        current.is_estimable
+        and current.ci_high is not None
+        and current.ci_high < WARNING_ABSOLUTE_FLOOR
+    )
+
     if total_checkins < MINIMUM_CHECKINS_FOR_WARNING:
         inconclusive = True
         inconclusive_reason = (
-            f"Only {total_checkins} check-ins so far. We need at least "
+            f"Only {total_checkins} day{'' if total_checkins == 1 else 's'} with "
+            f"a scored check-in so far. We need at least "
             f"{MINIMUM_CHECKINS_FOR_WARNING} before reading anything into a trend."
         )
+    elif current.n == 0:
+        inconclusive = True
+        inconclusive_reason = (
+            "No scored check-ins in this period yet, so there is nothing recent "
+            "to compare with your earlier baseline."
+        )
+    elif baseline.n == 0:
+        # Every scored day falls inside this period. Callers used to substitute
+        # the recent scores for the missing baseline, which compared the period
+        # with itself: a change of 0% by construction, shown as no concern. The
+        # floor needs no baseline, so it is still checked; anything else is
+        # the "can't tell yet" it really is.
+        if real_floor:
+            elevated = True
+            reason = _floor_reason(current)
+        else:
+            inconclusive = True
+            inconclusive_reason = (
+                "There is no earlier baseline to compare with yet: all of your "
+                "scored days fall inside this period. Keep checking in."
+            )
     elif not change.is_estimable:
         inconclusive = True
         inconclusive_reason = (
@@ -134,12 +166,6 @@ def analyze_trajectory(
             change.value is not None
             and change.value <= -WARNING_SCORE_DROP_THRESHOLD
             and change.excludes(0.0)          # interval clears zero
-        )
-        # Whole interval below the floor, not just the midpoint.
-        real_floor = (
-            current.is_estimable
-            and current.ci_high is not None
-            and current.ci_high < WARNING_ABSOLUTE_FLOOR
         )
 
         if real_drop:
@@ -153,12 +179,7 @@ def analyze_trajectory(
             )
         elif real_floor:
             elevated = True
-            reason = (
-                f"Your recent daily cognitive scores have been consistently low "
-                f"(average {current.value:.2f} out of 1.0, 95% CI "
-                f"{current.ci_low:.2f} to {current.ci_high:.2f}), with the whole "
-                f"range below {WARNING_ABSOLUTE_FLOOR}."
-            )
+            reason = _floor_reason(current)
         elif (
             change.value is not None
             and change.value <= -WARNING_SCORE_DROP_THRESHOLD
@@ -182,6 +203,15 @@ def analyze_trajectory(
         reason=reason,
         inconclusive=inconclusive,
         inconclusive_reason=inconclusive_reason,
+    )
+
+
+def _floor_reason(current: MetricCI) -> str:
+    return (
+        f"Your recent daily cognitive scores have been consistently low "
+        f"(average {current.value:.2f} out of 1.0, 95% CI "
+        f"{current.ci_low:.2f} to {current.ci_high:.2f}), with the whole "
+        f"range below {WARNING_ABSOLUTE_FLOOR}."
     )
 
 
@@ -250,7 +280,11 @@ def build_risk_comparison(
     suggestions = personalized_suggestions(age, traj.elevated_concern)
 
     return {
-        "user_recent_avg_score": traj.current_avg,
+        # None, not 0.0, when the period has no scored days: a new user used to
+        # be shown "your recent average: 0%" built from nothing at all.
+        "user_recent_avg_score": (
+            None if traj.current.value is None else round(traj.current.value, 3)
+        ),
         "user_recent_avg_ci_low": traj.current.ci_low,
         "user_recent_avg_ci_high": traj.current.ci_high,
         "trajectory_change_pct": (

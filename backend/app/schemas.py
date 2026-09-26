@@ -1,6 +1,6 @@
 """Pydantic schemas for API request/response bodies."""
 
-from datetime import datetime, time
+from datetime import date as date_type, datetime, time
 from typing import Optional, Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
@@ -224,7 +224,9 @@ class EveningCheckinOut(BaseModel):
 # ---------- Risk comparison / report ----------
 
 class RiskComparisonOut(BaseModel):
-    user_recent_avg_score: float             # 0-1, higher = better
+    # 0-1, higher = better. None when the period has no scored days -- never a
+    # made-up 0.
+    user_recent_avg_score: Optional[float] = None
     # 95% bootstrap interval on the recent average. None when there are too few
     # scored days to estimate one -- clients must render that as "not enough
     # data yet", never as a narrow interval.
@@ -255,6 +257,56 @@ class RiskComparisonOut(BaseModel):
 
     suggestions: list[str]
     citations: list[str]
+    disclaimer: str
+
+
+class TrendPoint(BaseModel):
+    date: date_type                          # the user's local calendar date
+    # The day's first evening check-in. None means no check-in that day: a
+    # gap, which the chart must not draw as zero.
+    score: Optional[float] = None
+    attempts: int = 0                        # >1: retakes, which do not count
+    # Mean of the trailing rolling_days with its 95% bootstrap interval. A
+    # single day is one observation and has no interval of its own; the band is
+    # on this. The interval is None below 3 scored days in the trailing window.
+    rolling_mean: Optional[float] = None
+    rolling_ci_low: Optional[float] = None
+    rolling_ci_high: Optional[float] = None
+    rolling_scored_days: int = 0
+
+
+class TrendOut(BaseModel):
+    """The daily series plus the SAME trajectory the risk report computes.
+
+    Summary fields come from app.ml.risk_comparison.analyze_trajectory on the
+    same one-score-per-day inputs, so for the same window the chart and the
+    report cannot disagree about whether there is a change.
+    """
+    user_id: int
+    window_days: int
+    timezone: str                            # zone the dates are in
+    rolling_days: int
+    points: list[TrendPoint]                 # every day in the window, oldest first
+
+    n_scored_days: int                       # days in the window with a check-in
+    recent_avg: Optional[float] = None
+    recent_avg_ci_low: Optional[float] = None
+    recent_avg_ci_high: Optional[float] = None
+    baseline_avg: Optional[float] = None
+    baseline_ci_low: Optional[float] = None
+    baseline_ci_high: Optional[float] = None
+    baseline_days: int = 0
+    change_pct: Optional[float] = None
+    change_ci_low_pct: Optional[float] = None
+    change_ci_high_pct: Optional[float] = None
+    elevated_concern: bool = False
+    concern_reason: Optional[str] = None
+    inconclusive: bool = False
+    inconclusive_reason: Optional[str] = None
+
+    # The raw evening check-ins in the window, as this endpoint used to return
+    # them. Kept for existing callers; chart from `points`.
+    series: list[dict]
     disclaimer: str
 
 
