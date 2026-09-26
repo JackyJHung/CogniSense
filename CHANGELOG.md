@@ -52,6 +52,10 @@ and a desktop client.
   baseline, and reported "no change" instead of "not enough to say yet".
 - The report showed a new account "your recent average: 0%", computed from no
   data, and counted a retaken evening test as another day of evidence.
+- The evening test could be retaken. Each retake was scored, added to the
+  check-in count behind every later score, and shown as the day's result. A
+  second attempt is now answered with the first result (409), as the morning
+  check-in already was.
 - The evening check-in stored and displayed a speech biomarker of 0.75 when no
   speech had been recorded.
 - The site root answered with the API's JSON in production, so the bare domain
@@ -83,6 +87,5 @@ and a desktop client.
 - No client records speech yet; the speech model is used only for an uploaded
   recording.
 - Notifications need the backend running.
-- The evening test can be retaken; only the first attempt of each day counts.
 
 [1.0.0]: https://github.com/JackyJHung/cognisense/releases/tag/v1.0.0

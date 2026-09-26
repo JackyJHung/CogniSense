@@ -257,6 +257,16 @@ def test_a_full_day_matches_the_api(client):
     assert evening["association_accuracy"] == 1.0
     assert 0 <= evening["daily_cognitive_score"] <= 1
 
+    # So does the evening test: a retake gets the first result back, unscored.
+    with pytest.raises(AlreadySubmitted) as retake:
+        client.submit_evening(
+            morning_checkin_id=morning["id"],
+            recalled_activities="a second try",
+            association_responses=answers,
+        )
+    assert retake.value.existing["id"] == evening["id"]
+    assert retake.value.existing["daily_cognitive_score"] == evening["daily_cognitive_score"]
+
     report = client.risk_report()
     for key in ("user_recent_avg_score", "user_recent_avg_ci_low", "user_recent_avg_ci_high",
                 "n_scored_days", "inconclusive", "inconclusive_reason",

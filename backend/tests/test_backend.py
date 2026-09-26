@@ -224,3 +224,53 @@ def test_no_recording_means_no_speech_score(client):
     body = evening.json()
     assert body["speech_biomarker_score"] is None
     assert body["daily_cognitive_score"] is not None
+
+
+def test_evening_test_is_taken_once(client):
+    """A second evening test for the same morning is refused with the first result.
+
+    A retake has already seen the answers, so it measures nothing new. It used to
+    be scored anyway: stored beside the first attempt, added to the check-in
+    count that feeds every later score, and shown as the day's result -- while
+    the reports count only the first attempt.
+    """
+    r = client.post("/users/signup", json={
+        "username": "retake_user", "password": "abcdefgh", "age": 66, "gender": "male",
+        "race": "aapi", "wake_time": "07:00:00", "sleep_time": "22:00:00",
+    })
+    auth = r.json()
+    client.headers["Authorization"] = f"Bearer {auth['token']}"
+    uid = auth["user"]["id"]
+
+    morning = client.post("/checkins/morning", json={
+        "user_id": uid, "planned_activities": "library, pharmacy",
+    }).json()
+    cues = morning["presented_associations"]
+
+    def evening(answer):
+        return client.post("/checkins/evening", json={
+            "user_id": uid,
+            "morning_checkin_id": morning["id"],
+            "recalled_activities": "library",
+            "association_responses": [
+                {"association_id": a["id"], "user_answer": answer(a), "response_latency_ms": 1500}
+                for a in cues
+            ],
+        })
+
+    first = evening(lambda a: "no idea")
+    assert first.status_code == 201, first.text
+    assert first.json()["association_accuracy"] == 0.0
+
+    # Now with every answer right -- which is exactly why it must not count.
+    retake = evening(lambda a: a["object_name"])
+    assert retake.status_code == 409, retake.text
+    detail = retake.json()["detail"]
+    assert detail["code"] == "evening_already_submitted"
+    assert detail["existing"]["id"] == first.json()["id"]
+    assert detail["existing"]["association_accuracy"] == 0.0
+    assert "disclaimer" in detail["existing"]
+
+    # Nothing was stored for the retake.
+    days = [p for p in client.get(f"/reports/trend/{uid}").json()["points"] if p["attempts"]]
+    assert len(days) == 1 and days[0]["attempts"] == 1

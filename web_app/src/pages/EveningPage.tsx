@@ -8,8 +8,14 @@ import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Disclaimer } from "@/components/Disclaimer";
-import { api, type EveningCheckin } from "@/lib/api";
+import { api, ApiError, type EveningCheckin } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+
+type ConflictDetail = {
+  code?: string;
+  message?: string;
+  existing?: EveningCheckin;
+};
 
 export function EveningPage() {
   const navigate = useNavigate();
@@ -24,6 +30,7 @@ export function EveningPage() {
   const [recalled, setRecalled] = useState("");
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [result, setResult] = useState<EveningCheckin | null>(null);
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -72,7 +79,16 @@ export function EveningPage() {
       });
       setResult(ev);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save");
+      // One test per morning: a retake has already seen the answers. The server
+      // sends back the first attempt, which is the day's result.
+      const detail =
+        err instanceof ApiError && err.status === 409 ? (err.detail() as ConflictDetail | null) : null;
+      if (detail?.existing) {
+        setResult(detail.existing);
+        setAlreadySubmitted(true);
+      } else {
+        setError(err instanceof Error ? err.message : "Could not save");
+      }
     } finally {
       setLoading(false);
     }
@@ -86,6 +102,12 @@ export function EveningPage() {
           <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
             Daily results
           </h1>
+          {alreadySubmitted && (
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              You had already taken this evening's test. This is the result that counts; the
+              answers you just entered were not scored.
+            </p>
+          )}
         </header>
         <div className="grid gap-4 sm:grid-cols-2">
           <Card>

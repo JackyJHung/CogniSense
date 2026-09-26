@@ -447,20 +447,30 @@ class CogniSenseApp(tk.Tk):
                 }
                 for assoc_id, e, started in answers
             ]
-            ev = self.api.submit_evening(
-                morning_checkin_id=morning["id"],
-                recalled_activities=recalled.get("1.0", "end").strip(),
-                association_responses=responses,
-            )
-            self._show_evening_result(ev)
+            try:
+                ev, already = self.api.submit_evening(
+                    morning_checkin_id=morning["id"],
+                    recalled_activities=recalled.get("1.0", "end").strip(),
+                    association_responses=responses,
+                ), False
+            except AlreadySubmitted as e:
+                # Taken earlier, on another device or before a restart. The
+                # first attempt is the day's result; this one was not scored.
+                ev, already = e.existing, True
+            self._show_evening_result(ev, already_submitted=already)
 
         ttk.Button(self._container, text="Submit evening check-in", command=submit).pack(pady=8)
         ttk.Button(self._container, text="Back", command=self.show_dashboard).pack()
         self._disclaimer(self._container)
 
-    def _show_evening_result(self, ev):
+    def _show_evening_result(self, ev, already_submitted=False):
         self._clear()
         self._header("Daily results")
+        if already_submitted:
+            ttk.Label(self._container,
+                      text="You had already taken this evening's test. This is the result "
+                           "that counts; the answers just entered were not scored.",
+                      wraplength=700).pack(anchor="w", padx=20, pady=(0, 8))
 
         def pct(v):
             return "—" if v is None else f"{v * 100:.0f}%"

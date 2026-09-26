@@ -276,8 +276,10 @@ with a 95% interval, and no trend claim until there are enough checks.
 
 `GET /reports/risk-comparison/{user_id}` and `GET /reports/trend/{user_id}?days=N`
 count the same thing (`app/daily_scores.py`): **one score per local day**, the
-day's first evening check-in. A retake of the evening test is not another day
-of evidence — the cues have been seen again — so it is not counted twice.
+day's first evening check-in. The evening test is taken once per morning: a
+second attempt has seen the cues again, so the endpoint answers it with a 409
+carrying the first result, which is what both clients then show. Retakes stored
+before that rule existed are still counted once.
 
 A period (the last 14 or 30 days) is judged against the user's own
 **baseline**: their earliest scored days before it, up to 14. Every number
@@ -627,9 +629,6 @@ database of its own.
   stand-in.
 - **Notifications need the backend running.** There is no delivery while the
   server is stopped — see the table above.
-- **The evening test can be retaken.** The endpoint accepts a second attempt
-  against the same morning; reports count only the first attempt of each day,
-  but nothing refuses the retake.
 
 ## Future work
 

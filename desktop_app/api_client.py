@@ -61,8 +61,9 @@ class SessionExpired(ApiError):
 
 
 class AlreadySubmitted(ApiError):
-    """409 on the morning check-in. Carries today's existing check-in, which the
-    server echoes so the client can show it without another request."""
+    """409 on the morning check-in or the evening test. Carries the existing
+    check-in, which the server echoes so the client can show it without another
+    request."""
 
     def __init__(self, status: int, detail: dict):
         super().__init__(status, detail)
@@ -238,11 +239,16 @@ class CogniSenseClient:
             raise
 
     def submit_morning(self, planned_activities: str) -> dict:
+        return self._submit_once("/checkins/morning", {
+            "user_id": self._uid(),
+            "planned_activities": planned_activities,
+        })
+
+    def _submit_once(self, path: str, body: dict) -> dict:
+        # The morning check-in and the evening test are once per day; a second
+        # POST is a 409 carrying the first, which the screens show instead.
         try:
-            return self._request("POST", "/checkins/morning", json={
-                "user_id": self._uid(),
-                "planned_activities": planned_activities,
-            })
+            return self._request("POST", path, json=body)
         except ApiError as err:
             if (err.status == 409 and isinstance(err.detail, dict)
                     and "existing" in err.detail):
@@ -271,7 +277,7 @@ class CogniSenseClient:
         association_responses: list[dict],
     ) -> dict:
         """`association_responses`: [{association_id, user_answer, response_latency_ms}]."""
-        return self._request("POST", "/checkins/evening", json={
+        return self._submit_once("/checkins/evening", {
             "user_id": self._uid(),
             "morning_checkin_id": morning_checkin_id,
             "recalled_activities": recalled_activities,

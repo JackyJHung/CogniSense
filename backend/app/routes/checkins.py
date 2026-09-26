@@ -278,6 +278,20 @@ def create_midday_checkin(
 # EVENING
 # =============================================================================
 
+def _evening_to_out(evening: EveningCheckin) -> EveningCheckinOut:
+    return EveningCheckinOut(
+        id=evening.id,
+        timestamp=evening.timestamp,
+        activity_recall_accuracy=evening.activity_recall_accuracy,
+        association_accuracy=evening.association_accuracy,
+        avg_response_latency_ms=evening.avg_response_latency_ms,
+        daily_cognitive_score=evening.daily_cognitive_score,
+        behavioral_biomarker_score=evening.behavioral_biomarker_score,
+        speech_biomarker_score=evening.speech_biomarker_score,
+        disclaimer=NON_DIAGNOSTIC_DISCLAIMER,
+    )
+
+
 @router.post("/evening", response_model=EveningCheckinOut, status_code=status.HTTP_201_CREATED)
 def create_evening_checkin(
     payload: EveningCheckinCreate,
@@ -285,7 +299,11 @@ def create_evening_checkin(
     current_user: User = Depends(get_current_user),
 ):
     """Core scoring endpoint. Grades the morning image-association test and computes
-    the daily cognitive score via the behavioral model."""
+    the daily cognitive score via the behavioral model.
+
+    Enforces ONE evening test per morning check-in. A second POST returns 409 with
+    the first result echoed in the error detail, as the morning's 409 does.
+    """
     user = require_own_id(payload.user_id, current_user)
 
     # This route already checked that the morning belonged to the claimed user --
@@ -298,6 +316,28 @@ def create_evening_checkin(
         ).first(),
         current_user, "Morning check-in",
     )
+
+    # A retake has already seen the answers, so it measures nothing new. It used
+    # to be scored anyway: stored beside the first attempt, added to
+    # cumulative_checkin_count (which feeds the consistency feature of every
+    # later score), and shown as the day's result -- while the reports, rightly,
+    # count only the first attempt. The first attempt is the result, so that is
+    # what a second submission gets back.
+    first_attempt = (
+        db.query(EveningCheckin)
+        .filter(EveningCheckin.morning_checkin_id == morning.id)
+        .order_by(EveningCheckin.timestamp.asc(), EveningCheckin.id.asc())
+        .first()
+    )
+    if first_attempt:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "evening_already_submitted",
+                "message": "This evening's test has already been taken.",
+                "existing": _evening_to_out(first_attempt).model_dump(mode="json"),
+            },
+        )
 
     # -------- Grade image-association test --------
     presented = {p["id"]: p for p in morning.presented_associations}
@@ -414,14 +454,4 @@ def create_evening_checkin(
     db.commit()
     db.refresh(evening)
 
-    return EveningCheckinOut(
-        id=evening.id,
-        timestamp=evening.timestamp,
-        activity_recall_accuracy=evening.activity_recall_accuracy,
-        association_accuracy=evening.association_accuracy,
-        avg_response_latency_ms=evening.avg_response_latency_ms,
-        daily_cognitive_score=evening.daily_cognitive_score,
-        behavioral_biomarker_score=evening.behavioral_biomarker_score,
-        speech_biomarker_score=evening.speech_biomarker_score,
-        disclaimer=NON_DIAGNOSTIC_DISCLAIMER,
-    )
+    return _evening_to_out(evening)
