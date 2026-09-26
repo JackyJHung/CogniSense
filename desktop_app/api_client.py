@@ -120,7 +120,10 @@ def local_timezone() -> str | None:
             candidates.append(target.split("/zoneinfo/", 1)[1])
     try:
         from zoneinfo import available_timezones
-        known = available_timezones()
+        # Linux lists "localtime" (a link to the machine's own zone) among the
+        # zones; the server refuses it, as it refuses "posixrules" -- see
+        # backend/app/timezones.py -- so it must never be offered.
+        known = available_timezones() - {"localtime", "posixrules"}
     except Exception:
         return None
     return next((c for c in candidates if c and c in known), None)

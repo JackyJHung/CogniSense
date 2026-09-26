@@ -388,3 +388,12 @@ def test_local_timezone_is_a_zone_the_server_accepts_or_none():
 
     zone = local_timezone()
     assert zone is None or timezones.is_valid(zone), zone
+
+
+def test_local_timezone_never_offers_the_machines_localtime_link(monkeypatch):
+    # TZ=localtime is a name Linux's zone list includes and the server refuses.
+    # Offered at signup, it would turn the whole signup into a 422.
+    from desktop_app.api_client import local_timezone
+
+    monkeypatch.setenv("TZ", "localtime")
+    assert local_timezone() not in ("localtime", "posixrules")

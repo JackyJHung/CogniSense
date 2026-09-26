@@ -48,6 +48,9 @@ and a desktop client.
   it on every request, returns to the login screen on a 401, and has a Log out
   button that revokes the session.
 - The check-in day was a UTC day, which rolled over at 17:00 in Los Angeles.
+- On Linux the server accepted "localtime" as a user's time zone. Debian and
+  Ubuntu list it as a zone, as a link to the server's own clock, so the user
+  would have got the server's day. Found by CI's first run on Linux.
 - The risk report compared a period with itself when there was no earlier
   baseline, and reported "no change" instead of "not enough to say yet".
 - The report showed a new account "your recent average: 0%", computed from no

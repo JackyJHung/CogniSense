@@ -33,13 +33,20 @@ logger = logging.getLogger(__name__)
 
 MAX_NAME_LENGTH = 64
 
+# Entries that load as zones but are not places. "localtime" links to whatever
+# zone the server itself runs in -- UTC in the container -- so a user who
+# "chose" it would get the server's day, not theirs. available_timezones() drops
+# "posixrules", but on Debian and Ubuntu it lists "localtime", which their
+# system database carries as a link to /etc/localtime. Windows reads the tzdata
+# package, which has neither, so this only showed on Linux: CI's first run.
+NOT_ZONES = frozenset({"localtime", "posixrules"})
+
 
 @lru_cache(maxsize=1)
 def _known_zones() -> frozenset[str]:
-    # available_timezones() walks the whole database, so it runs once. It also
-    # excludes entries that load but are not zones ("localtime", "posixrules"),
-    # which a bare ZoneInfo(name) probe would accept.
-    return frozenset(available_timezones())
+    # available_timezones() walks the whole database, so it runs once. A bare
+    # ZoneInfo(name) probe would accept the NOT_ZONES entries too.
+    return frozenset(available_timezones()) - NOT_ZONES
 
 
 def is_valid(name: Optional[str]) -> bool:
