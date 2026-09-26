@@ -473,7 +473,10 @@ class CogniSenseApp(tk.Tk):
             f"Image-association accuracy:   {pct(ev['association_accuracy'])}",
             f"Activity-recall accuracy:     {pct(ev['activity_recall_accuracy'])}",
             f"Average response latency:     {num(ev['avg_response_latency_ms'], 'd')} ms",
-            f"Speech biomarker score:       {num(ev['speech_biomarker_score'], '.2f')}",
+            "Speech biomarker score:       " + (
+                "not recorded" if ev["speech_biomarker_score"] is None
+                else format(ev["speech_biomarker_score"], ".2f")
+            ),
         ]
         for line in lines:
             ttk.Label(self._container, text=line, font=("Courier", 12)).pack(anchor="w", padx=20, pady=2)

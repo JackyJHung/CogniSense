@@ -357,7 +357,13 @@ def create_evening_checkin(
     else:
         lat_var = 0.0
 
-    speech_score = morning.speech_biomarker_score if morning.speech_biomarker_score is not None else 0.75
+    # No client records audio yet, so there is usually no speech measurement.
+    # The composite still needs a value in that slot, and a neutral 0.75 stands
+    # in -- but only inside the calculation. What is stored and shown as the
+    # speech biomarker is the measurement or nothing: a placeholder presented
+    # as a result would be a number nobody measured.
+    speech_measured = morning.speech_biomarker_score
+    speech_score = speech_measured if speech_measured is not None else 0.75
 
     feats = build_behavioral_feature_vector(
         activity_recall_accuracy=act_recall_accuracy,
@@ -393,7 +399,7 @@ def create_evening_checkin(
         association_accuracy=round(assoc_accuracy, 3),
         avg_response_latency_ms=avg_latency,
         behavioral_biomarker_score=round(behav_score, 3),
-        speech_biomarker_score=round(speech_score, 3),
+        speech_biomarker_score=None if speech_measured is None else round(speech_measured, 3),
         daily_cognitive_score=daily_score,
     )
     db.add(evening)

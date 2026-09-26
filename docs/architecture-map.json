@@ -2,6 +2,7 @@
   "name": "CogniSense",
   "version": "0.1.0",
   "generated_at": "2026-05-18",
+  "note": "Snapshot from 2026-05-18. It predates authentication, reminders, push notifications, per-user time zones and the trend report; the README describes the current system.",
   "description": "Early-risk screening for Alzheimer's & related dementias via speech + behavioral biomarkers. Shared FastAPI + PyTorch backend; two clients (React web, installable to a phone's Home Screen as a PWA; Tkinter desktop).",
   "tech_stack": {
     "backend": ["Python 3.12", "FastAPI 0.115", "SQLAlchemy 2.0", "Pydantic v2", "PyTorch 2.5", "librosa", "SQLite"],

@@ -14,8 +14,9 @@
 #   docker compose up -d --build
 #   docker compose logs -f web
 #
-# Bound to 127.0.0.1 only. nginx terminates TLS and proxies to it; the container
-# port is never reachable from outside the VM.
+# Bound to 127.0.0.1 only. A reverse proxy on the host (Caddy or nginx)
+# terminates TLS and proxies to it; the container port is never reachable from
+# outside the VM.
 
 services:
   web:
@@ -71,3 +72,18 @@ services:
 volumes:
   cognisense-db:
   cognisense-data:
+
+# A fixed subnet, so the address the reverse proxy's requests arrive FROM is
+# known in advance. Docker forwards the published port into the container, so
+# inside it every connection -- from Caddy or nginx on the host included -- comes
+# from this network's gateway, not from 127.0.0.1. The per-IP login throttle has
+# to name that address in COGNISENSE_TRUSTED_PROXIES to read X-Forwarded-For;
+# with Docker's usual random subnet it could not, and every user would share one
+# address and one lockout budget. Change both together if 172.31.250.0/24 is
+# already taken on the host.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
+          gateway: 172.31.250.1

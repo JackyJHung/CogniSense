@@ -191,3 +191,36 @@ def test_full_daily_flow(client):
     r = client.get(f"/reports/trend/{user_id}")
     assert r.status_code == 200
     assert len(r.json()["series"]) == 1
+
+
+def test_no_recording_means_no_speech_score(client):
+    """Without audio there is no speech measurement, and none may be reported.
+
+    The daily composite still uses a neutral stand-in for the speech slot, but
+    the evening result used to store and show that stand-in, 0.75, as if it
+    were the user's measured speech biomarker.
+    """
+    r = client.post("/users/signup", json={
+        "username": "quiet_user", "password": "abcdefgh", "age": 68, "gender": "female",
+        "race": "white", "wake_time": "07:00:00", "sleep_time": "22:00:00",
+    })
+    auth = r.json()
+    client.headers["Authorization"] = f"Bearer {auth['token']}"
+    uid = auth["user"]["id"]
+
+    morning = client.post("/checkins/morning", json={
+        "user_id": uid, "planned_activities": "garden, post office",
+    }).json()
+    evening = client.post("/checkins/evening", json={
+        "user_id": uid,
+        "morning_checkin_id": morning["id"],
+        "recalled_activities": "garden",
+        "association_responses": [
+            {"association_id": a["id"], "user_answer": a["object_name"], "response_latency_ms": 1500}
+            for a in morning["presented_associations"]
+        ],
+    })
+    assert evening.status_code == 201, evening.text
+    body = evening.json()
+    assert body["speech_biomarker_score"] is None
+    assert body["daily_cognitive_score"] is not None

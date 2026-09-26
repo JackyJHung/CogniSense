@@ -300,8 +300,8 @@ export function SecurityPage() {
               <ShieldCheck className="h-4 w-4 text-brand-500" /> Recovery codes
             </CardTitle>
             <CardDescription>
-              CogniSense has no email on file, so these codes are the only way back
-              in if you forget your password.
+              Single-use codes that get you back in if you forget your password,
+              with no email needed. Keep them somewhere safe, away from this device.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

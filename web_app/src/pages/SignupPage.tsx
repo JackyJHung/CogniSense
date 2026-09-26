@@ -91,8 +91,8 @@ export function SignupPage() {
         <CardHeader>
           <CardTitle>Create your account</CardTitle>
           <CardDescription>
-            Demographics help us compare your scores against age- and ethnicity-matched
-            research benchmarks. They never leave your device.
+            Your age, gender and ethnicity are stored with your account and used
+            only to compare your scores against matching research benchmarks.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -116,8 +116,12 @@ export function SignupPage() {
                   value={form.password}
                   onChange={(e) => update("password", e.target.value)}
                   required
-                  minLength={6}
+                  minLength={8}
+                  autoComplete="new-password"
                 />
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  At least 8 characters.
+                </p>
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="age">Age</Label>

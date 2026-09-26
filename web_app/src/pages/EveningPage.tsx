@@ -48,6 +48,7 @@ export function EveningPage() {
             </Link>
           </CardContent>
         </Card>
+        <Disclaimer />
       </Shell>
     );
   }
@@ -119,7 +120,14 @@ export function EveningPage() {
                 <Stat label="Image-association accuracy" value={`${Math.round(result.association_accuracy * 100)}%`} />
                 <Stat label="Activity recall" value={`${Math.round((result.activity_recall_accuracy ?? 0) * 100)}%`} />
                 <Stat label="Avg response latency" value={`${result.avg_response_latency_ms ?? 0} ms`} />
-                <Stat label="Speech biomarker" value={(result.speech_biomarker_score ?? 0).toFixed(2)} />
+                <Stat
+                  label="Speech biomarker"
+                  value={
+                    result.speech_biomarker_score == null
+                      ? "Not recorded"
+                      : result.speech_biomarker_score.toFixed(2)
+                  }
+                />
               </dl>
             </CardContent>
           </Card>

@@ -1,8 +1,41 @@
 # CogniSense
 
-AI/ML application for early-risk screening of Alzheimer's disease and related dementias (ADRD) using speech patterns and behavioral biomarkers captured via microphone and camera. CogniSense delivers daily check-ins, image-association memory tasks, biweekly/monthly reports, and personalized prevention guidance grounded in peer-reviewed research.
+A research and self-tracking app for people who want to keep an eye on their
+memory. Daily check-ins turn recall and image-association tests into a daily
+score. Trend reports compare that score with the user's own baseline, with
+honest uncertainty. Reminders help with the things they mean to do, and the
+suggestions come from the Lancet Commission's modifiable risk factors for
+Alzheimer's disease and related dementias (ADRD).
+
+> **Status — v1.0.** A complete, self-hostable app: a FastAPI backend, a web app
+> that installs on phones, and a desktop client. **The scoring models are demo
+> models trained on synthetic data** (`python -m app.ml.train_models`). No data
+> from anyone with a clinical diagnosis has ever been used, so what a score says
+> about a real person's cognition is **unestablished** — see
+> [Validating the models](#validating-the-models). CogniSense is **not a medical
+> diagnostic device**.
 
 > **Important:** CogniSense is a research and self-tracking tool. It is **NOT** a medical diagnostic device and does not replace professional evaluation. Any output from this app is a suggestion, not professional advice. If you or a loved one are experiencing worsening memory concerns, please consult a licensed physician or neurologist.
+
+## What's in v1.0
+
+1. **Onboarding** — age, gender, race/ethnicity, wake and sleep times, and a time zone taken from the device
+2. **Morning check-in** — today's plans, plus five image associations (cue word → object) to remember; one per local day
+3. **Midday check-in** — a light, ungraded recall prompt, as often as you like
+4. **Evening check-in** — recall the day, then name each object from its cue; scored into the day's cognitive score
+5. **Behavioral scoring** — recall accuracy, response latency and linguistic features through a PyTorch MLP
+6. **Risk report** — your recent average with its 95% interval, the change from your own baseline with its interval, an explicit "not enough to say yet" state, and age-, gender- and race-matched research benchmarks for context
+7. **Trend report** — 14- and 30-day views: each day's score, the 95% interval on the 7-day average, your baseline, and gaps for days you missed
+8. **Memory support** — save what you mean to do, get asked what you remember, and always see the list afterwards
+9. **Reminder notifications** — Web Push that arrives with the app closed, with quiet hours and a cooldown
+10. **Accounts** — revocable sessions, rate-limited login, password change, recovery codes, and email recovery when SMTP is configured
+11. **Two clients** — a web app that installs to a phone's Home Screen, and a Tkinter desktop app
+12. **Safety layer** — the non-diagnostic disclaimer on every screen and report
+
+**Speech scoring is backend-only for now.** A PyTorch 1D-CNN over MFCC features
+scores a recording uploaded to `POST /checkins/morning/{id}/audio`, but neither
+client records audio yet. Without a recording, the daily score's speech slot uses
+a fixed neutral stand-in (0.75), and no speech score is stored or shown.
 
 ## Architecture
 
@@ -25,36 +58,42 @@ cognisense-app/
 │   └── report.py        #   contract-enforcing Markdown + JSON renderer
 ├── backend/             # FastAPI server + PyTorch ML models + SQLite DB
 │   ├── app/
-│   │   ├── main.py              # FastAPI entry point
-│   │   ├── database.py          # SQLite setup
+│   │   ├── main.py              # FastAPI entry point; serves web_app/dist in production
+│   │   ├── config.py            # every environment setting; refuses unsafe production config
+│   │   ├── auth.py, csrf.py     # sessions (cookie or bearer), CSRF, authorisation checks
+│   │   ├── ratelimit.py         # login / signup / recovery throttling
+│   │   ├── timezones.py         # per-user IANA zones and local day bounds
+│   │   ├── daily_scores.py      # one score per local day, shared by the report and the trend
+│   │   ├── database.py          # SQLite setup + lightweight column migrations
 │   │   ├── schemas.py           # Pydantic request/response models
 │   │   ├── models/              # ORM models
-│   │   ├── routes/              # API endpoints (users, check-ins, reports)
-│   │   ├── ml/                  # PyTorch speech + behavioral models
+│   │   ├── routes/              # users, recovery, checkins, reports, reminders, push
+│   │   ├── ml/                  # PyTorch speech + behavioral models, risk comparison
 │   │   │   ├── validate.py      #   validation harness (nested CV + controls)
 │   │   │   └── text_features.py #   shared tokenisation / recall matching
 │   │   ├── memory/              # prospective-memory checks — the memory aid
 │   │   ├── notifications/       # Web Push: VAPID keys, sender, scheduler
-│   │   ├── reports/             # report templates
-│   │   └── data/                # Research benchmarks (age/gender/race)
+│   │   ├── reports/             # validation-report template
+│   │   └── data/                # research benchmarks + the non-diagnostic disclaimer
 │   ├── tests/
-│   └── requirements.txt
-├── desktop_app/         # Python-only Tkinter desktop client (stdlib UI)
+│   └── requirements*.txt
+├── desktop_app/         # Tkinter client; api_client.py holds its session
 ├── web_app/             # React + Vite + Tailwind web client; installable (PWA)
-└── docs/                # Data sources, model cards, architecture notes
+├── docs/                # architecture notes and data sources
+├── Dockerfile           # production image: built frontend + API in one origin
+└── docker-compose.yml   # single-VM deployment: web + one reminder scheduler
 ```
 
 You can run either the **Python-only desktop** experience (Tkinter, no npm needed) or the **web client** (modern look, animated, requires Node). They are fully independent — pick whichever you prefer or run both side-by-side against the same backend.
 
 ### Where `core/` came from
 
-`core/` is the part of a separate glioma diffusion-MRI research pipeline
-(`C:\Users\jjhun\projects\cognisense`) that was worth keeping: the machinery for
-producing a number you can defend. The tumour-specific stages — DWI loading,
-lesion-aware registration, CSD, tractography, connectome construction — were
-deliberately **not** merged. They are glioma-specific, they were never
-implemented, and they serve none of this app's goals. That project is untouched
-and still on disk.
+`core/` is the part of an earlier, unpublished glioma diffusion-MRI research
+pipeline that was worth keeping: the machinery for producing a number you can
+defend. The tumour-specific stages — DWI loading, lesion-aware registration,
+CSD, tractography, connectome construction — were deliberately **not** merged.
+They are glioma-specific, they were never implemented, and they serve none of
+this app's goals.
 
 What the merge actually bought:
 
@@ -85,16 +124,16 @@ instead.
 
 ## Setup
 
-The virtualenv and `node_modules` were intentionally not copied into this tree —
-virtualenvs hard-code their own paths and break when moved. Recreate them:
+Neither the virtualenv nor `node_modules` is committed; create them. The backend
+runs on Python 3.11 (what CI and the production image use) or 3.12.
 
 ### Backend
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\Activate.ps1          # PowerShell on Windows
-pip install -r requirements.txt
-python -m app.ml.train_models       # Trains demo models on synthetic data
+.venv\Scripts\Activate.ps1          # PowerShell; on macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt   # dev adds pytest + httpx, for the tests
+python -m app.ml.train_models       # trains the demo models on synthetic data
 uvicorn app.main:app --reload
 ```
 
@@ -119,13 +158,16 @@ runtime. Note that both shipped models are small and run fine on CPU; the GPU
 matters when you retrain on a real corpus, and the ceiling there is VRAM.
 
 ### Web app (React + Tailwind + Framer Motion)
-Requires Node.js LTS. Backend must be running on `localhost:8000`.
+Requires Node.js LTS. The backend must be running on `127.0.0.1:8000`.
 ```bash
 cd web_app
-npm install
+npm ci
 npm run dev          # http://localhost:5173
 ```
-Override the backend URL with `VITE_BACKEND_URL` in `web_app/.env.local` if needed.
+Vite proxies `/api` to the backend (`web_app/vite.config.ts`); to use a backend
+somewhere else, change the proxy target there. Keep the API on the page's own
+origin: the session cookie is `SameSite=Strict`, so an API on another origin
+never receives it and sign-in fails — see [why `/api` is proxied](#where-the-session-lives).
 
 ### Desktop app (Python-only — Tkinter)
 No extra dependencies; uses the same `backend/.venv`. The backend must be
@@ -140,7 +182,9 @@ closing the app discards it and **Log out** revokes it on the server. When a
 session ends — idle expiry, a password change, or "sign out everywhere" on
 another device — the next action returns to the login screen and says why.
 All HTTP goes through `desktop_app/api_client.py`, which
-`backend/tests/test_desktop_client.py` drives against the real API.
+`backend/tests/test_desktop_client.py` drives against the real API. It has no
+settings screen: the time zone, recovery codes and recovery email are set in
+the web app.
 
 ### On a phone: install the web app
 There is no separate mobile app. The web client ships a manifest
@@ -181,12 +225,22 @@ defensible product claim.
 ```bash
 cd backend
 python -m pytest tests -q
+
+cd ../web_app
+npm run lint
+npm run build        # type-checks, then builds
 ```
 
 `tests/test_core_no_leakage.py` is the firewall: it fails if test-fold data ever
 reaches training. It includes a direct demonstration — same data, same estimator,
 split by row instead of by user — of how much AUC inflates when one person is
 allowed to span a fold boundary.
+
+CI (`.github/workflows/ci.yml`) runs all of the above on every push and pull
+request — the backend suite and `python -m app.ml.validate` on Python 3.11, lint
+and build for the web client — then builds the production image, boots it under
+a production config and checks that `/health`, the app at `/`, and the web app
+manifest are served.
 
 ## Memory support (`/reminders`)
 
@@ -218,16 +272,41 @@ description would make an item harder to recall.
 Prospective recall rate is reported through `core.stats` like everything else —
 with a 95% interval, and no trend claim until there are enough checks.
 
+## Reports and trends
+
+`GET /reports/risk-comparison/{user_id}` and `GET /reports/trend/{user_id}?days=N`
+count the same thing (`app/daily_scores.py`): **one score per local day**, the
+day's first evening check-in. A retake of the evening test is not another day
+of evidence — the cues have been seen again — so it is not counted twice.
+
+A period (the last 14 or 30 days) is judged against the user's own
+**baseline**: their earliest scored days before it, up to 14. Every number
+carries a 95% bootstrap interval from `core.stats`. The attention warning needs
+either a drop of at least 20% whose whole interval lies below zero, or a recent
+average whose whole interval lies below 0.35. Too little data — fewer than 14
+scored days, no scored days in the period, or no baseline yet — is reported as
+**not enough to say yet**, never as a silent all-clear. Both endpoints run the
+same analysis on the same inputs, so the chart and the report cannot disagree.
+
+The trend chart draws each day's score as a dot, the 7-day average as a line
+with its 95% interval as a band, and the baseline as a reference line. Days
+without a check-in are gaps, never zeros. It has a text summary and a table
+view, and works by keyboard.
+
 ## Authentication
 
-Every route except signup, login and the VAPID public key requires a bearer
-token. Signup and login return one:
+Every API route needs a session except signup, login, the recovery routes that
+start from a code or an emailed link, the VAPID public key, `/` and `/health`.
+Browsers carry the session in a cookie (see below). Signup and login also return
+the token, for native clients:
 
 ```json
 { "user": {...}, "token": "s3cr3t...", "token_type": "bearer", "expires_at": "..." }
 ```
 
-Send it as `Authorization: Bearer <token>`. It lasts 30 days.
+Send it as `Authorization: Bearer <token>`. It expires after 30 days without
+use, and after 90 days regardless — see
+[Configuration](#configuration-and-deployment).
 
 **What this fixed.** Endpoints used to take `user_id` from the path or body and
 trust it. `GET /reminders/4` returned user 4's reminders to anyone who asked —
@@ -256,8 +335,8 @@ the credential stayed valid indefinitely. `POST /users/logout` with
 ### Where the session lives
 
 Browsers get an **HttpOnly cookie** — script cannot read it, so an XSS on the
-origin can no longer walk off with a 30-day credential. The native client, the
-desktop app, keeps using `Authorization: Bearer`: its HTTP session refuses
+origin can no longer walk off with a long-lived credential. The native client,
+the desktop app, keeps using `Authorization: Bearer`: its HTTP session refuses
 cookies, so the token is the only credential it ever sends.
 
 A cookie is attached automatically, which is CSRF. Three layers answer that:
@@ -306,7 +385,7 @@ account recovery would find recovery locked as well — the one route back into
 the account barred at exactly the moment it was needed, by their own honest
 attempts.
 
-Tuning: `COGNISENSE_*` variables are read at import; see `app/ratelimit.py`.
+The limits are constants at the top of `app/ratelimit.py`.
 
 ### Password change and account recovery
 
@@ -367,11 +446,12 @@ uvicorn app.main:app --env-file .env
 **A production deploy that is misconfigured refuses to start.** With
 `COGNISENSE_ENV=production`, `config.validate()` raises on boot if cookies are
 not `Secure`, if the allowed origins are empty, still contain `localhost`, or
-are plain `http://`, or if the VAPID subject is still the placeholder. Failing
-closed is deliberate: a warning in a log scrolls past and the server keeps
-serving, which is precisely how an insecure deploy survives. In development the
-same list is only logged, so a developer sees what would break a deploy without
-being blocked.
+are plain `http://`, if the public URL is local or plain `http://`, if any
+setting still names the template's placeholder domain, or if the VAPID subject
+is still the placeholder. Failing closed is deliberate: a warning in a log
+scrolls past and the server keeps serving, which is precisely how an insecure
+deploy survives. In development the same list is only logged, so a developer
+sees what would break a deploy without being blocked.
 
 The startup log prints the active configuration, so the security posture is
 visible rather than assumed:
@@ -381,7 +461,8 @@ config environment        development
 config cookie_secure      False
 config allowed_origins    ['http://localhost:5173', ...]
 config trusted_proxies    none (X-Forwarded-For ignored)
-config session_idle_days  7
+config session_ttl_days   90
+config session_idle_days  30
 ```
 
 | Variable | Default | Notes |
@@ -403,9 +484,14 @@ to be believed whenever present — and since any client can set a header, sendi
 a different value each request bought a fresh per-IP rate-limit budget every
 time, making the address limit decorative. Now the header is read only when the
 direct peer is listed in `COGNISENSE_TRUSTED_PROXIES`; with none set, the socket
-address is always used. Set it to the address the proxy connects *from*
-(`127.0.0.1` for nginx on the same host), and make the proxy strip inbound
-`X-Forwarded-For`, or a client can still prepend a forged entry.
+address is always used. Set it to the address the proxy's requests arrive from,
+as the app sees them. Under `docker compose` that is the compose network's
+gateway, `172.31.250.1` — pinned in `docker-compose.yml` and already set in the
+production template — **not** `127.0.0.1`, because Docker forwards the published
+port and every connection reaches the container from the gateway. For uvicorn
+run directly behind a proxy on the same host, it is `127.0.0.1`. Either way the
+proxy must replace any inbound `X-Forwarded-For` (Caddy does by default), or a
+client can still prepend a forged entry.
 
 **Sessions expire on idle as well as absolutely**, and the idle window is the
 one that binds: 30 days idle inside a 90-day absolute cap. Active use refreshes
@@ -430,6 +516,20 @@ required:
 ```bash
 cp backend/.env.production.example backend/.env
 # replace cognisense.example throughout, then:
+docker compose up -d --build
+```
+
+`docker compose` builds the image (frontend and API in one origin, demo models
+trained in) and runs two services from it: `web` — gunicorn with two uvicorn
+workers, bound to `127.0.0.1:8000` — and exactly one reminder `scheduler`. The
+database and the uploads (including the VAPID key) live in named volumes, so a
+redeploy keeps them. Put a TLS-terminating reverse proxy such as Caddy on the
+host in front of `127.0.0.1:8000`.
+
+Without Docker, the same `.env` runs under uvicorn:
+
+```bash
+cd backend
 uvicorn app.main:app --env-file .env --host 127.0.0.1 --port 8000
 ```
 
@@ -449,12 +549,13 @@ to confirm the chain works before relying on it.
 How it fits together:
 
 ```
-scheduler (in the FastAPI process, every 60s)
+scheduler, every 60s  (inside the API process in development;
+                       its own service under docker compose)
     -> is anything pending and due for this user?
     -> is it inside their waking hours?
-    -> have they been pushed in the last 6h?
-        -> pywebpush  ->  push service (FCM / Mozilla)  ->  service worker
-                                                              -> notification
+    -> have they been pushed in the last 8h?
+        -> pywebpush  ->  push service (FCM / Mozilla / Apple)  ->  service worker
+                                                                     -> notification
 ```
 
 **What "closed" actually means.** Be precise about this, because the honest
@@ -468,7 +569,7 @@ answer is not "always":
 | Browser closed, desktop | Only if the browser keeps a background process (Chrome: Settings → System → "Continue running background apps") |
 | Backend stopped | No — the scheduler *is* the sender |
 
-Three rules keep it from becoming spam: a cooldown (default 6h), quiet hours
+Three rules keep it from becoming spam: a cooldown (default 8h), quiet hours
 taken from the user's own wake/sleep times, and nothing sent when there is
 nothing due. `wake_time` and `sleep_time` are bare clock times, so quiet hours
 are placed in the user's [time zone](#time-zones) — the same one their check-in
@@ -483,8 +584,8 @@ Tuning, via environment variables:
 | Variable | Default | Purpose |
 |---|---|---|
 | `COGNISENSE_PUSH_TICK_SECONDS` | `60` | how often the scheduler looks |
-| `COGNISENSE_PUSH_COOLDOWN_HOURS` | `6` | minimum gap between pushes |
-| `COGNISENSE_DISABLE_SCHEDULER` | unset | set to `1` to stop the loop (tests do) |
+| `COGNISENSE_PUSH_COOLDOWN_HOURS` | `8` | minimum gap between pushes |
+| `COGNISENSE_DISABLE_SCHEDULER` | unset | set to `1` to stop the loop (tests, and the compose `web` service, do) |
 | `COGNISENSE_VAPID_SUBJECT` | `mailto:admin@cognisense.local` | contact in the VAPID JWT |
 | `COGNISENSE_LOG_LEVEL` | `INFO` | `DEBUG` to trace scheduler decisions |
 
@@ -516,30 +617,36 @@ UTC, exactly as before; the web app fills it in from the device the next time
 it opens. `tzdata` is in `requirements.txt` because Windows has no system zone
 database of its own.
 
-## Core feature set (Phase 1 — this build)
+## Known limitations
 
-1. **Onboarding** — age, gender, race/ethnicity, wake time, sleep time
-2. **Morning check-in** — record today's plans + present 5 image associations
-3. **Midday check-in** — light recall prompt
-4. **Evening check-in** — recall today's activities + test image associations
-5. **Speech biomarker capture** — record short voice sample, extract MFCC features, score with PyTorch 1D-CNN
-6. **Behavioral biomarker scoring** — recall accuracy, response latency, linguistic features → PyTorch MLP
-7. **Research-grounded risk comparison** — user scores against age/gender/race benchmarks, now with intervals and an explicit inconclusive state
-8. **Safety layer** — every report, warning, and suggestion carries the non-diagnostic disclaimer
+- **No clinical validity yet.** The models are trained on synthetic data and
+  nothing in the project carries a clinical label — see
+  [Validating the models](#validating-the-models).
+- **No client records speech.** The speech model and its upload endpoint exist,
+  but until a client records audio the daily score's speech slot is a fixed
+  stand-in.
+- **Notifications need the backend running.** There is no delivery while the
+  server is stopped — see the table above.
+- **The evening test can be retaken.** The endpoint accepts a second attempt
+  against the same morning; reports count only the first attempt of each day,
+  but nothing refuses the retake.
 
-## Phase 2 (next)
+## Future work
 
-- **Recall matching is token overlap**, not meaning. "Ring the dentist" only
-  matches "call the dentist about the crown" because "dentist" is a distinctive
-  word; a paraphrase sharing no words would be scored as forgotten. Lemma
-  matching or sentence embeddings would fix it, at the cost of a dependency the
-  offline-first desktop client currently avoids.
-- **Notifications need the backend running.** There is no delivery when the
-  server is stopped — see the table above. A always-on host, or a native
-  scheduled task, is what removes that constraint.
-- Attention warning triggered by sustained deviation from benchmarks
-- Alarm-lock mode (phone unlocks only on check-in completion)
-- Research-backed daily activity recommendations driven by the 14 Lancet 2024 modifiable risk factors
+- **Clinical validation on a labelled corpus** — DementiaBank Pitt or ADReSS,
+  which need data-access approval, under ethics review. `app/ml/validate.py` is
+  written so that swapping `synthetic_cohort()` for a real labelled loader is the
+  only change required.
+- **Semantic recall matching.** Recall is matched by token overlap, not meaning.
+  "Ring the dentist" only matches "call the dentist about the crown" because
+  "dentist" is a distinctive word; a paraphrase sharing no words is scored as
+  forgotten. Lemma matching or sentence embeddings would fix it, at the cost of
+  a dependency the offline-first desktop client currently avoids.
+- **Alarm-lock mode** — the phone unlocks only once the morning check-in is
+  done. Enforcing it needs OS lock-screen access, which a web app cannot have.
+- **Native mobile apps** — for that lock-screen integration, and for on-device
+  scheduling that does not depend on the server being up. The installable web
+  app covers phones until then.
 
 ## Data sources (see `docs/data_sources.md`)
 
