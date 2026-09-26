@@ -28,6 +28,7 @@ way.
 from __future__ import annotations
 
 import os
+import sys
 from http.cookiejar import DefaultCookiePolicy
 from typing import Any
 
@@ -89,12 +90,57 @@ def describe(detail: Any) -> str:
             if not isinstance(err, dict):
                 continue
             # loc is ["body", "<field>", ...]; the "body" prefix means nothing
-            # to the person reading it.
+            # to the person reading it, nor does pydantic's "Value error, "
+            # in front of messages our own validators raise.
             field = ".".join(str(p) for p in err.get("loc", ())[1:]) or "request"
-            parts.append(f"{field}: {err.get('msg', 'is invalid')}")
+            msg = str(err.get("msg", "is invalid")).removeprefix("Value error, ")
+            parts.append(f"{field}: {msg}")
         if parts:
             return "; ".join(parts)
     return str(detail)
+
+
+def local_timezone() -> str | None:
+    """This machine's IANA time zone, or None if it cannot be told reliably.
+
+    Sent at signup and login so the account's day turns over at local midnight
+    rather than at UTC midnight -- 17:00 in Los Angeles. None leaves the zone
+    unset (counted as UTC) until a browser login or the web app's Settings
+    fills it in. Only names the local zone database knows are offered: the
+    server refuses unknown ones at signup.
+    """
+    candidates = [os.environ.get("TZ", "").lstrip(":")]
+    if sys.platform == "win32":
+        candidates.append(_icu_default_zone())
+    else:
+        # /etc/localtime is normally a symlink into .../zoneinfo/<Area>/<City>.
+        target = os.path.realpath("/etc/localtime")
+        if "/zoneinfo/" in target:
+            candidates.append(target.split("/zoneinfo/", 1)[1])
+    try:
+        from zoneinfo import available_timezones
+        known = available_timezones()
+    except Exception:
+        return None
+    return next((c for c in candidates if c and c in known), None)
+
+
+def _icu_default_zone() -> str | None:
+    """Windows reports its zone by a Windows name ("Pacific Standard Time"),
+    not an IANA one. The ICU library that ships with Windows 10 and later --
+    the same one browsers use to answer this -- translates it."""
+    try:
+        import ctypes
+        icu = ctypes.WinDLL("icu")
+        fn = icu.ucal_getDefaultTimeZone
+        fn.restype = ctypes.c_int32
+        fn.argtypes = [ctypes.c_wchar_p, ctypes.c_int32, ctypes.POINTER(ctypes.c_int)]
+        buf = ctypes.create_unicode_buffer(128)
+        status = ctypes.c_int(0)
+        length = fn(buf, 128, ctypes.byref(status))
+        return buf.value[:length] if status.value <= 0 and length > 0 else None
+    except (OSError, AttributeError):
+        return None
 
 
 class _DesktopSession(requests.Session):
@@ -121,9 +167,17 @@ class CogniSenseClient:
     and validation rather than a mock of them.
     """
 
-    def __init__(self, base_url: str = DEFAULT_BACKEND_URL, session: Any = None):
+    def __init__(
+        self,
+        base_url: str = DEFAULT_BACKEND_URL,
+        session: Any = None,
+        device_timezone: str | None = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self._http = session if session is not None else _DesktopSession()
+        # The zone this device reports at signup and login. The app passes
+        # local_timezone(); None reports nothing.
+        self.device_timezone = device_timezone
         self._token: str | None = None
         self.user: dict | None = None
 
@@ -134,12 +188,16 @@ class CogniSenseClient:
     # ------------------------------------------------------------------ auth
 
     def signup(self, **fields: Any) -> dict:
+        if self.device_timezone:
+            fields.setdefault("timezone", self.device_timezone)
         return self._adopt(self._request("POST", "/users/signup", json=fields))
 
     def login(self, username: str, password: str) -> dict:
-        return self._adopt(self._request(
-            "POST", "/users/login", json={"username": username, "password": password},
-        ))
+        # The server adopts the zone only for an account that has none yet.
+        body = {"username": username, "password": password}
+        if self.device_timezone:
+            body["timezone"] = self.device_timezone
+        return self._adopt(self._request("POST", "/users/login", json=body))
 
     def logout(self, all_devices: bool = False) -> None:
         """End the session on the server, then forget it here regardless.

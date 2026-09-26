@@ -12,6 +12,7 @@
  * than guessed at.
  */
 import { api, BACKEND_URL } from "@/lib/api";
+import { deviceTimeZone } from "@/lib/timezone";
 
 export interface PushStatus {
   enabled: boolean;
@@ -115,9 +116,9 @@ export async function enablePush(userId: number): Promise<PushStatus> {
   await api.post("/push/subscribe", {
     user_id: userId,
     subscription: subscription.toJSON(),
-    // Minutes to ADD to UTC for local time. getTimezoneOffset() is inverted,
-    // so UTC-7 reports 420 and we send -420.
-    utc_offset_minutes: -new Date().getTimezoneOffset(),
+    // Quiet hours follow the account's time zone. An account without one
+    // takes this device's; a zone already set is never changed from here.
+    timezone: deviceTimeZone(),
     user_agent: navigator.userAgent.slice(0, 400),
   });
 

@@ -38,6 +38,7 @@ from app.models.push import PushSubscription
 from app.models.reminder import STATUS_PENDING, ReminderItem
 from app.models.user import User
 from app.notifications.sender import notify_user
+from app.timezones import zone_for
 
 logger = logging.getLogger(__name__)
 
@@ -53,14 +54,17 @@ DISABLED = config.DISABLE_SCHEDULER
 def is_awake(user: User, now_utc: datetime | None = None) -> bool:
     """Is it currently inside this user's waking hours?
 
-    `utc_offset_minutes` comes from the browser at subscribe time. It defaults
-    to 0, which for a user who has never subscribed would mean UTC -- but such a
-    user has no devices to push to anyway, so the default never decides anything
-    real.
+    wake_time and sleep_time are bare clock times; the user's IANA zone is what
+    places them in the day -- the same zone their check-in day is counted in,
+    so there is one source of truth. It used to be a fixed UTC offset reported
+    at subscribe time, which was an hour out for half of every year wherever
+    clocks change. A zone not known yet counts as UTC; subscribing fills it in
+    (routes/push.py), so a user with devices to push to almost always has one.
     """
     now_utc = now_utc or datetime.now(timezone.utc)
-    local = now_utc + timedelta(minutes=user.utc_offset_minutes or 0)
-    now_t = local.time()
+    if now_utc.tzinfo is None:
+        now_utc = now_utc.replace(tzinfo=timezone.utc)
+    now_t = now_utc.astimezone(zone_for(user)).time()
 
     wake, sleep = user.wake_time, user.sleep_time
     if wake is None or sleep is None:

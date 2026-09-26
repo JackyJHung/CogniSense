@@ -6,6 +6,7 @@ import {
   type User,
 } from "./api";
 import { AuthCtx } from "./auth";
+import { deviceTimeZone } from "./timezone";
 
 const STORAGE_KEY = "cognisense.session";
 
@@ -54,7 +55,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const me = await api.get<User>("/users/me");
-        if (!cancelled) setUser(me);
+        if (cancelled) return;
+        setUser(me);
+        // An account from before time zones existed has none, and with a
+        // 30-day idle session its next login could be a month away. Fill it in
+        // from this device now -- only when unset, the same rule the server
+        // applies at login -- so the day starts at local midnight from today.
+        const zone = deviceTimeZone();
+        if (me.timezone === null && zone) {
+          api.post<User>("/users/me/timezone", { timezone: zone }).then(
+            (updated) => {
+              if (!cancelled) setUser(updated);
+            },
+            () => undefined, // not fatal: Settings can still set it
+          );
+        }
       } catch {
         if (!cancelled) clearLocal();
       } finally {

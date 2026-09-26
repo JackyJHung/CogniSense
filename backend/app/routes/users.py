@@ -33,9 +33,11 @@ from app.schemas import (
     LoginRequest,
     LogoutRequest,
     PasswordChangeRequest,
+    TimezoneUpdate,
     UserCreate,
     UserOut,
 )
+from app.timezones import adopt_if_unknown
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -99,6 +101,7 @@ def signup(
         race=payload.race,
         wake_time=payload.wake_time,
         sleep_time=payload.sleep_time,
+        timezone=payload.timezone,
     )
     db.add(user)
     db.commit()
@@ -133,6 +136,9 @@ def login(
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     clear(db, keys)
+    # Accounts from before zones existed learn theirs at the next login.
+    if adopt_if_unknown(user, payload.timezone):
+        db.commit()
     return issue_session(db, user, user_agent, response)
 
 
@@ -196,6 +202,24 @@ def change_password(
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
     """Who is this session? Lets a client validate stored state on startup."""
+    return current_user
+
+
+@router.post("/me/timezone", response_model=UserOut)
+def set_timezone(
+    payload: TimezoneUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Set the zone the user's days are counted in -- a deliberate choice.
+
+    Unlike login, this overwrites: it is the user saying where they live, and
+    the only thing that changes a zone once an account has one. An unknown
+    name is a 422 (TimezoneUpdate), never a silent UTC.
+    """
+    current_user.timezone = payload.timezone
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

@@ -225,7 +225,7 @@ def verify_email(payload: EmailTokenRequest, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=400,
             detail="That confirmation link is invalid or has expired. "
-                   "Request a new one from Password & recovery.",
+                   "Request a new one from Settings.",
         )
     user.email_verified_at = datetime.now(timezone.utc)
     db.commit()

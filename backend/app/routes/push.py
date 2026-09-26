@@ -30,6 +30,7 @@ from app.schemas import (
     PushSubscribeRequest,
     PushUnsubscribeRequest,
 )
+from app.timezones import adopt_if_unknown
 
 router = APIRouter(prefix="/push", tags=["push"])
 
@@ -90,9 +91,10 @@ def subscribe(
         )
         db.add(sub)
 
-    # The browser is the only party that knows the device's real offset, and
-    # the scheduler needs it to avoid pushing in the middle of the night.
-    user.utc_offset_minutes = payload.utc_offset_minutes
+    # Quiet hours come from the user's stored zone. Turning notifications on is
+    # the moment it matters most, so an account with no zone yet takes this
+    # device's -- on the same never-overwrite terms as login.
+    adopt_if_unknown(user, payload.timezone)
 
     db.commit()
     db.refresh(sub)
@@ -134,12 +136,14 @@ def push_status(
     )
     wake = user.wake_time.strftime("%H:%M") if user.wake_time else "?"
     sleep = user.sleep_time.strftime("%H:%M") if user.sleep_time else "?"
+    # Name the zone, so a wrong one is visible where its effect is felt.
+    zone = user.timezone or "UTC — time zone not set yet"
     return PushStatusOut(
         enabled=devices > 0,
         devices=devices,
         last_push_at=user.last_push_at,
         cooldown_hours=scheduler.COOLDOWN_HOURS,
-        quiet_hours=f"quiet between {sleep} and {wake} local",
+        quiet_hours=f"quiet between {sleep} and {wake} ({zone})",
         currently_awake=scheduler.is_awake(user),
         scheduler_running=not scheduler.DISABLED,
     )

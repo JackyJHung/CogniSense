@@ -2,7 +2,9 @@
 
 from datetime import datetime, time
 from typing import Optional, Literal
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+
+from app import timezones
 
 
 Gender = Literal["female", "male", "nonbinary", "other", "prefer_not"]
@@ -22,6 +24,15 @@ class UserCreate(BaseModel):
     race: Race
     wake_time: time
     sleep_time: time
+    # IANA name from the client, e.g. the browser's
+    # Intl.DateTimeFormat().resolvedOptions().timeZone. Optional: a client that
+    # cannot tell leaves the account's zone unknown, counted as UTC.
+    timezone: Optional[str] = Field(None, max_length=timezones.MAX_NAME_LENGTH)
+
+    @field_validator("timezone")
+    @classmethod
+    def known_zone(cls, v: Optional[str]) -> Optional[str]:
+        return None if v is None else timezones.validate(v)
 
 
 class UserOut(BaseModel):
@@ -37,11 +48,27 @@ class UserOut(BaseModel):
     created_at: datetime
     email: Optional[str] = None
     email_verified_at: Optional[datetime] = None
+    # None until a client has reported it; days are then counted in UTC.
+    timezone: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
     username: str
     password: str
+    # The device's zone, adopted only by an account that has none yet.
+    # Deliberately NOT validated here: a browser reporting something odd must
+    # never stop a person logging in. The route checks it and ignores a bad one.
+    timezone: Optional[str] = None
+
+
+class TimezoneUpdate(BaseModel):
+    """An explicit choice from the settings page, so an unknown name is a 422."""
+    timezone: str = Field(..., max_length=timezones.MAX_NAME_LENGTH)
+
+    @field_validator("timezone")
+    @classmethod
+    def known_zone(cls, v: str) -> str:
+        return timezones.validate(v)
 
 
 class AuthOut(BaseModel):
@@ -325,9 +352,11 @@ class PushSubscriptionIn(BaseModel):
 class PushSubscribeRequest(BaseModel):
     user_id: int
     subscription: PushSubscriptionIn
-    # Minutes to ADD to UTC for this device's local time; UTC-7 sends -420.
-    # The browser gets it from -new Date().getTimezoneOffset().
-    utc_offset_minutes: int = Field(0, ge=-720, le=840)
+    # The device's IANA zone. Quiet hours are computed from the user's stored
+    # zone; this only fills it in for an account that has none, on the same
+    # terms as login. It replaced utc_offset_minutes, which an older client may
+    # still send -- extra fields are ignored, so that does no harm.
+    timezone: Optional[str] = None
     user_agent: Optional[str] = Field(None, max_length=400)
 
 

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Disclaimer } from "@/components/Disclaimer";
+import { TimeZoneSettings } from "@/components/TimeZoneSettings";
 import {
   api,
   type AuthResult,
@@ -136,14 +137,16 @@ export function SecurityPage() {
 
       <header className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-          Password &amp; recovery
+          Settings
         </h1>
         <p className="mt-2 text-slate-600 dark:text-slate-400">
-          Change your password, and set up a way back in if you forget it.
+          Your time zone, your password, and a way back in if you forget it.
         </p>
       </header>
 
       <div className="space-y-6">
+        <TimeZoneSettings />
+
         {/* -------- password change -------- */}
         <Card>
           <CardHeader>

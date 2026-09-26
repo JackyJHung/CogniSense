@@ -353,3 +353,28 @@ def test_an_unreachable_server_is_its_own_error():
     client = CogniSenseClient(base_url=f"http://127.0.0.1:{port}")
     with pytest.raises(ServerUnreachable):
         client.login("anyone", "anything")
+
+
+# --------------------------------------------------------------------------
+# The device's time zone
+# --------------------------------------------------------------------------
+
+def test_signup_carries_the_devices_time_zone(transport):
+    client = CogniSenseClient(base_url="http://testserver", session=transport,
+                              device_timezone="America/Los_Angeles")
+    assert _signup(client)["timezone"] == "America/Los_Angeles"
+
+
+def test_login_fills_in_the_zone_of_an_account_without_one(transport):
+    _signup(CogniSenseClient(base_url="http://testserver", session=transport))
+    client = CogniSenseClient(base_url="http://testserver", session=transport,
+                              device_timezone="Europe/London")
+    assert client.login("desk_user", PASSWORD)["timezone"] == "Europe/London"
+
+
+def test_local_timezone_is_a_zone_the_server_accepts_or_none():
+    from app import timezones
+    from desktop_app.api_client import local_timezone
+
+    zone = local_timezone()
+    assert zone is None or timezones.is_valid(zone), zone

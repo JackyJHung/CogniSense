@@ -1,8 +1,7 @@
 """Check-in endpoints: morning (plan + image presentation), midday (light recall), evening (recall + test)."""
 
-import json
 import random
-from datetime import datetime, time as dtime, timedelta, timezone
+from datetime import datetime, timezone, tzinfo
 from pathlib import Path
 from typing import Optional
 
@@ -21,6 +20,7 @@ from app.schemas import (
 )
 from app.data.research_benchmarks import NON_DIAGNOSTIC_DISCLAIMER
 from app.ml.behavioral_model import activity_overlap, build_behavioral_feature_vector
+from app.timezones import day_bounds_utc, local_date, zone_for
 
 
 router = APIRouter(prefix="/checkins", tags=["checkins"])
@@ -57,8 +57,15 @@ def _get_behavioral_scorer():
 # MORNING
 # =============================================================================
 
-def _today_bounds(now_utc: Optional[datetime] = None) -> tuple[datetime, datetime]:
-    """Return [start, end) of the current UTC day, as naive datetimes.
+def _now() -> datetime:
+    """The current instant; a function so tests can pin the clock."""
+    return datetime.now(timezone.utc)
+
+
+def _today_bounds(
+    now_utc: Optional[datetime] = None, zone: tzinfo = timezone.utc,
+) -> tuple[datetime, datetime]:
+    """Return [start, end) of the current day in `zone`, as naive UTC datetimes.
 
     BUG THIS FIXES. This used to build the window from `date.today()` -- the
     server's LOCAL date -- and compare it against `timestamp` columns, which
@@ -80,15 +87,14 @@ def _today_bounds(now_utc: Optional[datetime] = None) -> tuple[datetime, datetim
     this. Mixing an aware datetime into the comparison would work, but keeping
     both sides in one representation is what makes the code readable.
 
-    LIMITATION: "today" is now a UTC day, so the boundary falls at 17:00 local
-    for a UTC-7 user rather than at their midnight. Doing this properly needs a
-    per-user timezone on the User model, which does not exist yet. This change
-    makes the behaviour correct and consistent; it does not make it local.
+    THE DAY IS THE USER'S OWN. `zone` is the user's IANA time zone (see
+    app/timezones.py), so the day turns over at their local midnight. A UTC day
+    turned over at 17:00 for somebody in Los Angeles, which filed every evening
+    check-in under the next day. Across a DST change the day is 23 or 25 hours
+    long. An account whose zone is not known yet is counted in UTC, as before.
     """
-    now = now_utc or datetime.now(timezone.utc)
-    day = now.astimezone(timezone.utc).date() if now.tzinfo else now.date()
-    start = datetime.combine(day, dtime.min)
-    return start, start + timedelta(days=1)
+    now = now_utc or _now()
+    return day_bounds_utc(local_date(now, zone), zone)
 
 
 def _morning_to_out(morning: MorningCheckin) -> MorningCheckinOut:
@@ -108,7 +114,7 @@ def get_today_morning(
     current_user: User = Depends(require_self),
 ):
     """Fetch today's morning check-in for a user, if one exists. 404 if not yet submitted today."""
-    start, end = _today_bounds()
+    start, end = _today_bounds(zone=zone_for(current_user))
     morning = (
         db.query(MorningCheckin)
         .filter(MorningCheckin.user_id == user_id)
@@ -135,10 +141,11 @@ def create_morning_checkin(
     """
     user = require_own_id(payload.user_id, current_user)
 
-    # Block duplicate morning check-ins on the same calendar day (server-local time).
-    # Once submitted, the associations are locked so the evening test grades against the
-    # original morning rather than a freshly-rolled set.
-    start, end = _today_bounds()
+    # Block duplicate morning check-ins on the same calendar day -- the user's
+    # own, in their time zone. Once submitted, the associations are locked so the
+    # evening test grades against the original morning rather than a
+    # freshly-rolled set.
+    start, end = _today_bounds(zone=zone_for(user))
     existing = (
         db.query(MorningCheckin)
         .filter(MorningCheckin.user_id == user.id)

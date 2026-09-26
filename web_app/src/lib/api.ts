@@ -9,7 +9,7 @@ class ApiError extends Error {
   status: number;
   body: unknown;
   constructor(status: number, body: unknown) {
-    super(typeof body === "string" ? body : JSON.stringify(body));
+    super(describe(body));
     this.status = status;
     this.body = body;
   }
@@ -20,6 +20,41 @@ class ApiError extends Error {
     }
     return this.body;
   }
+  /** True when a 422 names this request field, e.g. "timezone". */
+  concernsField(field: string): boolean {
+    const d = this.detail();
+    return (
+      this.status === 422 &&
+      Array.isArray(d) &&
+      d.some((e) => Array.isArray(e?.loc) && e.loc.includes(field))
+    );
+  }
+}
+
+/* Every page shows `err.message` as-is, so it has to be a sentence. It used to
+ * be JSON.stringify(body), which put {"detail":"Invalid credentials"} -- or a
+ * pydantic error list -- in front of the person using the app. FastAPI's
+ * detail is a string, an object with a message (the 409s), or pydantic's list
+ * of validation errors. */
+function describe(body: unknown): string {
+  const detail =
+    body && typeof body === "object" && "detail" in body
+      ? (body as { detail: unknown }).detail
+      : body;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail.map((e) => {
+      const loc: unknown[] = Array.isArray(e?.loc) ? e.loc.slice(1) : [];
+      // pydantic prefixes messages raised by our own validators.
+      const msg = String(e?.msg ?? "is invalid").replace(/^Value error, /, "");
+      return loc.length ? `${loc.join(".")}: ${msg}` : msg;
+    });
+    if (parts.length) return parts.join("; ");
+  }
+  if (detail && typeof detail === "object" && "message" in detail) {
+    return String((detail as { message: unknown }).message);
+  }
+  return JSON.stringify(detail);
 }
 
 /* ---------- session transport ----------
@@ -157,6 +192,9 @@ export interface User {
   wake_time: string;
   sleep_time: string;
   created_at: string;
+  /** IANA zone the user's day is counted in; null until a client reports one
+   *  (the server then counts in UTC). */
+  timezone: string | null;
 }
 
 export interface AssociationPresented {

@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Disclaimer } from "@/components/Disclaimer";
-import { api, type AuthResult } from "@/lib/api";
+import { api, ApiError, type AuthResult } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { deviceTimeZone } from "@/lib/timezone";
 
 const GENDERS = ["female", "male", "nonbinary", "other", "prefer_not"] as const;
 const RACES = ["white", "black", "hispanic", "aapi", "ai_an", "other", "prefer_not"] as const;
@@ -63,7 +64,18 @@ export function SignupPage() {
         wake_time: form.wake_time.length === 5 ? `${form.wake_time}:00` : form.wake_time,
         sleep_time: form.sleep_time.length === 5 ? `${form.sleep_time}:00` : form.sleep_time,
       };
-      const auth = await api.post<AuthResult>("/users/signup", payload);
+      // Where this person's day begins, and when reminders stay quiet.
+      const timezone = deviceTimeZone();
+      let auth: AuthResult;
+      try {
+        auth = await api.post<AuthResult>("/users/signup", { ...payload, timezone });
+      } catch (err) {
+        // The server refuses a zone it does not know. The zone was detected,
+        // not chosen, so it must not stand between someone and an account:
+        // sign up without it, and Settings can set it afterwards.
+        if (!(timezone && err instanceof ApiError && err.concernsField("timezone"))) throw err;
+        auth = await api.post<AuthResult>("/users/signup", payload);
+      }
       signIn(auth.user);
       navigate("/dashboard");
     } catch (err) {

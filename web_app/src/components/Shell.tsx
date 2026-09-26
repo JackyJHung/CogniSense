@@ -11,7 +11,7 @@ export function Shell({ children, sidebar }: ShellProps) {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-8 lg:flex-row">
       {/* Below lg the sidebar follows the page instead of disappearing. It
-          holds Log out and Password & recovery, and on a phone -- where the
+          holds Log out and Settings, and on a phone -- where the
           installed web app is the only app -- hiding it left no way to reach
           either. */}
       {sidebar && (

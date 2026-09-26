@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/Label";
 import { Disclaimer } from "@/components/Disclaimer";
 import { api, type AuthResult } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { deviceTimeZone } from "@/lib/timezone";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -22,7 +23,13 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const auth = await api.post<AuthResult>("/users/login", { username, password });
+      // An account from before time zones existed adopts this device's; the
+      // server never lets a login move a zone that is already set.
+      const auth = await api.post<AuthResult>("/users/login", {
+        username,
+        password,
+        timezone: deviceTimeZone(),
+      });
       signIn(auth.user);
       navigate("/dashboard");
     } catch (err) {

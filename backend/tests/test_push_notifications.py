@@ -18,10 +18,10 @@ from app.notifications import scheduler, vapid
 # --------------------------------------------------------------------------
 
 class FakeUser:
-    def __init__(self, wake, sleep, offset_minutes=0):
+    def __init__(self, wake, sleep, zone=None):
         self.wake_time = wake
         self.sleep_time = sleep
-        self.utc_offset_minutes = offset_minutes
+        self.timezone = zone          # IANA name; None counts as UTC
 
 
 def at(hour, minute=0):
@@ -47,18 +47,32 @@ def test_sleep_time_past_midnight_is_handled():
     assert scheduler.is_awake(u, at(6)) is False
 
 
-def test_the_offset_is_what_decides_it():
+def test_the_zone_is_what_decides_it():
     """Same UTC instant, two users, opposite answers.
 
-    14:00 UTC is 07:00 for a UTC-7 user (awake) and 02:00 for a UTC+12 user
-    (asleep). Without the offset the server would wake somebody at 2am.
+    14:00 UTC on 14 August is 07:00 in Los Angeles (UTC-7, awake) and 02:00 in
+    Auckland (UTC+12, asleep). Without the zone the server would wake somebody
+    at 2am. (This used fixed offsets until quiet hours moved to IANA zones;
+    the property it checks is unchanged.)
     """
     instant = at(14)
-    pacific = FakeUser(dtime(7, 0), dtime(22, 0), offset_minutes=-420)   # UTC-7
-    nz = FakeUser(dtime(7, 0), dtime(22, 0), offset_minutes=720)         # UTC+12
+    pacific = FakeUser(dtime(7, 0), dtime(22, 0), zone="America/Los_Angeles")
+    nz = FakeUser(dtime(7, 0), dtime(22, 0), zone="Pacific/Auckland")
 
     assert scheduler.is_awake(pacific, instant) is True
     assert scheduler.is_awake(nz, instant) is False
+
+
+def test_quiet_hours_follow_daylight_saving():
+    """The case a fixed offset got wrong for half of every year.
+
+    14:30 UTC is 07:30 in Los Angeles in July (PDT) but 06:30 in January
+    (PST). A UTC-7 offset recorded in summer called January 06:30 "07:30,
+    awake" and sent a push half an hour before this user's alarm.
+    """
+    u = FakeUser(dtime(7, 0), dtime(22, 0), zone="America/Los_Angeles")
+    assert scheduler.is_awake(u, datetime(2026, 7, 14, 14, 30, tzinfo=timezone.utc)) is True
+    assert scheduler.is_awake(u, datetime(2026, 1, 14, 14, 30, tzinfo=timezone.utc)) is False
 
 
 def test_missing_times_do_not_block_notifications():
@@ -151,10 +165,11 @@ def db(monkeypatch):
     Base.metadata.create_all(bind=engine)
 
     session = Session()
+    # No zone: counted as UTC, so the at(...) instants below are this user's
+    # local clock.
     user = User(
         id=1, username="pusher", hashed_password="x", age=70, gender="female",
         race="white", wake_time=dtime(7), sleep_time=dtime(22),
-        utc_offset_minutes=0,
     )
     session.add(user)
     session.add(PushSubscription(
@@ -286,7 +301,7 @@ def test_subscribe_is_idempotent_on_the_endpoint(client, db):
             "endpoint": "https://push.example/second",
             "keys": {"p256dh": "kk", "auth": "aa"},
         },
-        "utc_offset_minutes": -420,
+        "timezone": "America/Los_Angeles",
     }
     first = client.post("/push/subscribe", json=body)
     assert first.status_code == 201, first.text
@@ -297,8 +312,33 @@ def test_subscribe_is_idempotent_on_the_endpoint(client, db):
     assert db.query(PushSubscription).filter(
         PushSubscription.endpoint == "https://push.example/second"
     ).count() == 1
-    # The browser's offset is recorded so quiet hours mean something.
-    assert db.query(User).get(1).utc_offset_minutes == -420
+    # An account with no zone yet takes the subscribing device's, so quiet
+    # hours mean something from the first push.
+    assert db.query(User).get(1).timezone == "America/Los_Angeles"
+
+
+def _subscribe(client, zone):
+    return client.post("/push/subscribe", json={
+        "user_id": 1,
+        "subscription": {"endpoint": "https://push.example/z", "keys": {"p256dh": "k", "auth": "a"}},
+        "timezone": zone,
+    })
+
+
+def test_subscribing_never_overwrites_a_zone_already_set(client, db):
+    """Only settings changes a zone once set; a device merely reports one."""
+    db.query(User).get(1).timezone = "Europe/London"
+    db.commit()
+
+    assert _subscribe(client, "America/Los_Angeles").status_code == 201
+    db.expire_all()
+    assert db.query(User).get(1).timezone == "Europe/London"
+
+
+def test_an_unknown_zone_from_a_device_is_ignored(client, db):
+    assert _subscribe(client, "Mars/Olympus_Mons").status_code == 201
+    db.expire_all()
+    assert db.query(User).get(1).timezone is None
 
 
 def test_status_reports_the_chain(client):

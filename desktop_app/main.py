@@ -36,6 +36,7 @@ from api_client import (
     CogniSenseClient,
     ServerUnreachable,
     SessionExpired,
+    local_timezone,
 )
 
 BG = "#f5f6fa"
@@ -96,7 +97,9 @@ class CogniSenseApp(tk.Tk):
         self.title("CogniSense")
         self.geometry("780x640")
         self.configure(bg=BG)
-        self.api = api or CogniSenseClient()
+        # The machine's zone goes with signup and login, so the account's day
+        # turns over at local midnight; see api_client.local_timezone.
+        self.api = api or CogniSenseClient(device_timezone=local_timezone())
 
         style = ttk.Style(self)
         try:

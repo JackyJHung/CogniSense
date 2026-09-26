@@ -40,11 +40,16 @@ class User(Base):
     def email_is_verified(self) -> bool:
         return bool(self.email and self.email_verified_at)
 
-    # Minutes to ADD to UTC to reach this user's local time, so UTC-7 is -420.
-    # The browser reports it when subscribing to notifications. Without it the
-    # server has no way to know whether it is the middle of someone's night --
-    # wake_time and sleep_time above are bare clock times with no zone.
-    utc_offset_minutes = Column(Integer, default=0, nullable=False)
+    # IANA zone name, e.g. "America/Los_Angeles". It decides where the user's
+    # check-in day begins, and gives wake_time and sleep_time above -- bare
+    # clock times -- a zone, so push quiet hours know when it is night for
+    # them. NULL means no client has reported it yet, and is counted as UTC;
+    # see app/timezones.py.
+    #
+    # This replaced utc_offset_minutes, a fixed offset that went an hour wrong
+    # at every DST change. That column is left in existing databases -- nothing
+    # reads it, and dropping a column is not reversible -- but no longer mapped.
+    timezone = Column(String(64), nullable=True)
 
     # Cooldown anchor for reminder pushes, so a standing reminder cannot turn
     # into a notification every minute.

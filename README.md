@@ -470,9 +470,9 @@ answer is not "always":
 
 Three rules keep it from becoming spam: a cooldown (default 6h), quiet hours
 taken from the user's own wake/sleep times, and nothing sent when there is
-nothing due. The browser reports its UTC offset when it subscribes, because
-`wake_time` and `sleep_time` are bare clock times with no zone attached — the
-server would otherwise have no idea whether it is 3am for that person.
+nothing due. `wake_time` and `sleep_time` are bare clock times, so quiet hours
+are placed in the user's [time zone](#time-zones) — the same one their check-in
+day follows — or the server would have no idea whether it is 3am for them.
 
 **The notification never names the items.** It says "You have 3 things saved",
 never what they are. Naming them would hand over the answers to a recall test,
@@ -493,6 +493,28 @@ Tuning, via environment variables:
 it silently breaks every existing subscription, because browsers pin the
 `applicationServerKey` they subscribed with. Do not copy a development key to a
 real deployment; generate a fresh one there and let subscribers re-register.
+
+## Time zones
+
+Each account has an IANA time zone (`users.timezone`, e.g. `America/Los_Angeles`).
+The check-in day turns over at midnight there — one morning check-in per local
+day, and "today's" morning is today's for the user, not for UTC. Push quiet
+hours use the same zone, so there is one source of truth. A zone name rather
+than a UTC offset, because an offset is an hour wrong for half of every year
+wherever clocks change; day windows are 23 or 25 hours long on DST days.
+
+| When | What happens to the zone |
+|---|---|
+| Signup | Set from the device: the browser's `Intl.DateTimeFormat().resolvedOptions().timeZone`, or the desktop's ICU / `/etc/localtime` |
+| Login, or turning on notifications | Filled in **only if the account has none** — never overwritten, so a trip or a borrowed laptop cannot move someone's day |
+| Settings page | Changed deliberately; offers "use this device's zone" when they differ |
+
+Unknown names are refused with a 422 at signup and in Settings, and ignored at
+login — a strange value from a browser must never stop someone logging in.
+Accounts created before zones existed have none (`NULL`), which is counted as
+UTC, exactly as before; the web app fills it in from the device the next time
+it opens. `tzdata` is in `requirements.txt` because Windows has no system zone
+database of its own.
 
 ## Core feature set (Phase 1 — this build)
 
@@ -515,9 +537,6 @@ real deployment; generate a fresh one there and let subscribers re-register.
 - **Notifications need the backend running.** There is no delivery when the
   server is stopped — see the table above. A always-on host, or a native
   scheduled task, is what removes that constraint.
-- **Per-user timezones.** The check-in "day" is a UTC day, so it rolls over at
-  17:00 for a UTC-7 user. Push quiet hours *do* use the browser-reported offset;
-  the check-in window does not, because the User model has no timezone field.
 - Biweekly / monthly longitudinal reports with trend charts
 - Attention warning triggered by sustained deviation from benchmarks
 - Alarm-lock mode (phone unlocks only on check-in completion)

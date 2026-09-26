@@ -57,12 +57,16 @@ def _run_lightweight_migrations():
                 text("ALTER TABLE users ADD COLUMN morning_revisit_count INTEGER DEFAULT 0 NOT NULL")
             )
 
-    # users.utc_offset_minutes -- added with the push-notification feature.
-    if "utc_offset_minutes" not in user_cols:
+    # users.timezone -- IANA name, replacing utc_offset_minutes. Existing rows
+    # are left NULL ("not known yet", counted as UTC, which is what they got
+    # before). Their old offset is not converted: -420 is Los Angeles in
+    # summer, Denver in winter and Phoenix all year, so any guess would be
+    # confidently wrong for some of them. Clients fill it in -- see
+    # app/routes/users.py. The retired utc_offset_minutes column is not
+    # created for new databases and is left alone in old ones.
+    if "timezone" not in user_cols:
         with engine.begin() as conn:
-            conn.execute(
-                text("ALTER TABLE users ADD COLUMN utc_offset_minutes INTEGER DEFAULT 0 NOT NULL")
-            )
+            conn.execute(text("ALTER TABLE users ADD COLUMN timezone VARCHAR(64)"))
 
     # users.last_push_at -- nullable, so no DEFAULT is needed.
     if "last_push_at" not in user_cols:
