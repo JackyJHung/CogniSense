@@ -1,5 +1,7 @@
 # CogniSense
 
+[![CI](https://github.com/JackyJHung/cognisense/actions/workflows/ci.yml/badge.svg)](https://github.com/JackyJHung/cognisense/actions/workflows/ci.yml)
+
 A research and self-tracking app for people who want to keep an eye on their
 memory. Daily check-ins turn recall and image-association tests into a daily
 score. Trend reports compare that score with the user's own baseline, with
@@ -15,9 +17,20 @@ Alzheimer's disease and related dementias (ADRD).
 > [Validating the models](#validating-the-models). CogniSense is **not a medical
 > diagnostic device**.
 
+<p align="center">
+  <img src="docs/screenshots/report.png" width="70%" alt="The risk report: the recent average with its 95% range, peer benchmarks, and a 30-day trend chart of daily scores with the 7-day average, its 95% band and the personal baseline">
+  &nbsp;
+  <img src="docs/screenshots/phone-dark.png" width="24%" alt="The same trend card on a phone in dark mode">
+</p>
+<p align="center"><sub>The risk report and trend, on a desktop and on a phone in dark mode. Demo account, synthetic data.</sub></p>
+
 > **Important:** CogniSense is a research and self-tracking tool. It is **NOT** a medical diagnostic device and does not replace professional evaluation. Any output from this app is a suggestion, not professional advice. If you or a loved one are experiencing worsening memory concerns, please consult a licensed physician or neurologist.
 
 ## What's in v1.0
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" width="80%" alt="The dashboard: morning, midday and evening check-ins, the risk report, daily suggestions and things to remember">
+</p>
 
 1. **Onboarding** — age, gender, race/ethnicity, wake and sleep times, and a time zone taken from the device
 2. **Morning check-in** — today's plans, plus five image associations (cue word → object) to remember; one per local day
@@ -79,7 +92,7 @@ cognisense-app/
 │   └── requirements*.txt
 ├── desktop_app/         # Tkinter client; api_client.py holds its session
 ├── web_app/             # React + Vite + Tailwind web client; installable (PWA)
-├── docs/                # architecture notes and data sources
+├── docs/                # architecture notes, data sources, README screenshots
 ├── Dockerfile           # production image: built frontend + API in one origin
 └── docker-compose.yml   # single-VM deployment: web + one reminder scheduler
 ```
@@ -629,6 +642,9 @@ database of its own.
   stand-in.
 - **Notifications need the backend running.** There is no delivery while the
   server is stopped — see the table above.
+- **The association pictures are placeholders.** Each cue is shown with its
+  object's name under a generic picture icon; the image files the pool names
+  (`apple.png`, …) are not part of the project.
 
 ## Future work
 

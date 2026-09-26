@@ -60,6 +60,10 @@ and a desktop client.
   asking the server, so on a new device the evening test said there was no
   morning check-in, and on a device last used yesterday it tested the evening
   against yesterday's cues.
+- The web app signed out on any 401, so a wrong "current password" when
+  changing it logged the person out; and on any failure of its start-up check,
+  so did a server restart. It now signs out only once `/users/me` confirms the
+  session is gone.
 - The evening check-in stored and displayed a speech biomarker of 0.75 when no
   speech had been recorded.
 - The site root answered with the API's JSON in production, so the bare domain
@@ -91,5 +95,7 @@ and a desktop client.
 - No client records speech yet; the speech model is used only for an uploaded
   recording.
 - Notifications need the backend running.
+- The association pictures are placeholders: each cue shows its object's
+  name under a generic picture icon.
 
 [1.0.0]: https://github.com/JackyJHung/cognisense/releases/tag/v1.0.0
