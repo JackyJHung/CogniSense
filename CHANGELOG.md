@@ -107,4 +107,4 @@ and a desktop client.
 - The association pictures are placeholders: each cue shows its object's
   name under a generic picture icon.
 
-[1.0.0]: https://github.com/JackyJHung/cognisense/releases/tag/v1.0.0
+[1.0.0]: https://github.com/JackyJHung/CogniSense/releases/tag/v1.0.0

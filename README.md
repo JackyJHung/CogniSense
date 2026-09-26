@@ -1,6 +1,6 @@
 # CogniSense
 
-[![CI](https://github.com/JackyJHung/cognisense/actions/workflows/ci.yml/badge.svg)](https://github.com/JackyJHung/cognisense/actions/workflows/ci.yml)
+[![CI](https://github.com/JackyJHung/CogniSense/actions/workflows/ci.yml/badge.svg)](https://github.com/JackyJHung/CogniSense/actions/workflows/ci.yml)
 
 A research and self-tracking app for people who want to keep an eye on their
 memory. Daily check-ins turn recall and image-association tests into a daily
