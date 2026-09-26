@@ -39,9 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  // Any 401 from anywhere in the app drops us to the login screen. Without
-  // this, a revoked or expired token leaves the UI rendering a logged-in shell
-  // over endpoints that all fail.
+  // A lost session, once /users/me confirms it (see api.ts), drops us to the
+  // login screen. Without this, a revoked or expired token leaves the UI
+  // rendering a logged-in shell over endpoints that all fail.
   useEffect(() => {
     setUnauthorizedHandler(clearLocal);
     return () => setUnauthorizedHandler(null);
@@ -71,7 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           );
         }
       } catch {
-        if (!cancelled) clearLocal();
+        // A 401 has already signed us out through the handler above. Anything
+        // else -- the server restarting during a deploy, a dropped connection --
+        // says nothing about the session, and used to sign the person out all
+        // the same. The cached user stays; the next real answer settles it.
       } finally {
         if (!cancelled) setLoading(false);
       }

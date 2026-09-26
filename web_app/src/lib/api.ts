@@ -93,6 +93,25 @@ export function setUnauthorizedHandler(fn: (() => void) | null): void {
   onUnauthorized = fn;
 }
 
+/* Not every 401 means the session is gone. A wrong "current password" when
+ * changing it, or when adding a recovery email, is a 401 from a perfectly good
+ * session -- and signing out on any 401 turned that typo into a trip back to
+ * the login screen. So a 401 elsewhere only prompts a question to /users/me,
+ * and only its 401 signs out. Concurrent 401s share the one check. */
+let sessionCheck: Promise<unknown> | null = null;
+
+function sessionRejected(path: string): void {
+  if (path === "/users/me") {
+    onUnauthorized?.();
+    return;
+  }
+  sessionCheck ??= request("GET", "/users/me")
+    .catch(() => undefined)
+    .finally(() => {
+      sessionCheck = null;
+    });
+}
+
 function buildHeaders(method: string, hasBody: boolean): Record<string, string> {
   const headers: Record<string, string> = {};
   if (hasBody) headers["Content-Type"] = "application/json";
@@ -116,10 +135,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
   const text = await res.text();
   const parsed = text ? safeJson(text) : null;
-  if (res.status === 401) {
-    // The session is gone, expired, or was revoked elsewhere.
-    onUnauthorized?.();
-  }
+  // Possibly: the session is gone, expired, or was revoked elsewhere.
+  if (res.status === 401) sessionRejected(path);
   if (!res.ok) throw new ApiError(res.status, parsed ?? text);
   return parsed as T;
 }
@@ -138,9 +155,7 @@ async function requestForm<T>(path: string, form: FormData): Promise<T> {
   });
   const text = await res.text();
   const parsed = text ? safeJson(text) : null;
-  if (res.status === 401) {
-    onUnauthorized?.();
-  }
+  if (res.status === 401) sessionRejected(path);
   if (!res.ok) throw new ApiError(res.status, parsed ?? text);
   return parsed as T;
 }
