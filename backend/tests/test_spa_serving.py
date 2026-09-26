@@ -56,3 +56,79 @@ def test_without_a_built_frontend_the_root_is_json_for_everyone(tmp_path, monkey
     monkeypatch.setattr(main, "_DIST", tmp_path / "not-built")
     r = TestClient(main.app).get("/", headers={"Accept": BROWSER_ACCEPT})
     assert r.json()["name"] == "CogniSense API"
+
+
+# --------------------------------------------------------------------------
+# The built app's own API calls, which all go to /api/...
+#
+# In development Vite strips the prefix; in production nothing did, so every
+# call fell through to the SPA fallback -- a GET came back as index.html with
+# a 200, a POST as a 405 -- and the deployed web app could not log in. These
+# drive the API exactly as the built app does.
+# --------------------------------------------------------------------------
+
+@pytest.fixture()
+def web(monkeypatch):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from app.database import Base, get_db
+    from app.models import (  # noqa: F401
+        checkin, image_association, push, reminder, security, session, user,
+    )
+
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    def override_get_db():
+        db = Session()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    main.app.dependency_overrides[get_db] = override_get_db
+    yield TestClient(main.app)
+    main.app.dependency_overrides.clear()
+
+
+SIGNUP = {
+    "username": "web_user", "password": "a-long-passphrase", "age": 70,
+    "gender": "female", "race": "white", "wake_time": "07:00:00", "sleep_time": "22:00:00",
+}
+
+
+def test_the_built_app_reaches_the_api_under_api(web):
+    assert web.get("/api/health").json() == {"status": "ok"}
+
+    r = web.post("/api/users/signup", json=SIGNUP)
+    assert r.status_code == 201, r.text
+    # The session arrives as the cookie, as it does for the browser.
+    me = web.get("/api/users/me")
+    assert me.status_code == 200
+    assert me.headers["content-type"].startswith("application/json")
+    assert me.json()["username"] == "web_user"
+
+
+def test_csrf_still_guards_api_calls(web):
+    web.post("/api/users/signup", json=SIGNUP)
+    # A cookie-authenticated POST without the double-submit token is refused
+    # under /api exactly as at the root...
+    assert web.post("/api/users/logout", json={"all_devices": False}).status_code == 403
+    # ...and allowed with it.
+    token = web.cookies.get("cognisense_csrf")
+    r = web.post("/api/users/logout", json={"all_devices": False},
+                 headers={"X-CSRF-Token": token})
+    assert r.status_code == 200, r.text
+
+
+def test_an_unknown_api_path_is_a_404_not_the_page(web, dist):
+    r = web.get("/api/no-such-endpoint", headers={"Accept": BROWSER_ACCEPT})
+    assert r.status_code == 404
+    assert 'id="root"' not in r.text
+    banner = web.get("/api", headers={"Accept": BROWSER_ACCEPT})
+    assert banner.json()["name"] == "CogniSense API"

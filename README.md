@@ -374,8 +374,10 @@ construction.
 **Why `/api` is proxied.** A `SameSite=Strict` cookie set by `127.0.0.1:8000` is
 never sent to a page on `localhost:5173` — different sites. Weakening it to
 `SameSite=None` would re-open the exact hole the cookie exists to close. Instead
-Vite proxies `/api` to the backend in development, and the backend serves
-`web_app/dist` itself in production, so the browser sees one origin either way.
+Vite proxies `/api` to the backend in development, and in production the
+backend serves `web_app/dist` itself and answers `/api` directly, stripping the
+prefix as the proxy does (`ApiPrefix` in `app/main.py`), so the browser sees one
+origin either way.
 Relatedly, the old CORS config (`allow_origins=["*"]` with
 `allow_credentials=True`) was not merely loose — browsers refuse to send cookies
 to a wildcard origin, so it would have broken cookie auth outright.

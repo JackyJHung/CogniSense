@@ -150,6 +150,13 @@ jobs:
           curl -fsS http://127.0.0.1:8000/index.html | grep -qi '<div id="root"'
           curl -fsS -H 'Accept: text/html' http://127.0.0.1:8000/ | grep -qi '<div id="root"'
 
+      # The built app calls the API under /api. The container used to have
+      # nothing there: GETs got index.html, POSTs a 405, and no one could log in.
+      - name: The web app's /api path reaches the API
+        run: |
+          curl -fsS http://127.0.0.1:8000/api/health | grep -q '"ok"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/users/me)" = "401"
+
       - name: Web app manifest is served, typed as a manifest
         run: |
           curl -fsS -o /dev/null -w '%{content_type}\n' http://127.0.0.1:8000/manifest.webmanifest \

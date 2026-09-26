@@ -4,7 +4,7 @@ import logging
 import mimetypes
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -36,7 +36,7 @@ app = FastAPI(
         "This is a self-tracking research tool, NOT a diagnostic device. "
         "Suggestions are not medical advice."
     ),
-    version="0.1.0",
+    version="1.0.0",
 )
 
 # CSRF must be added BEFORE CORS so that it runs AFTER it: Starlette applies
@@ -56,6 +56,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Set on requests that arrived under /api; see ApiPrefix.
+VIA_API_PREFIX = "cognisense.via_api_prefix"
+
+
+class ApiPrefix:
+    """Answer /api/... as well as the root paths.
+
+    The web client calls "/api/users/login" and so on (web_app/src/lib/api.ts).
+    In development Vite's proxy strips the prefix before the request gets here.
+    In production nothing did: every call from the built app fell through to
+    the SPA fallback below, which answered GETs with index.html and POSTs with
+    405, so the deployed web app could not even log in. This strips it the way
+    the proxy does, and marks the request so that an /api path matching no
+    route is a 404 rather than the page. Native clients keep calling the root.
+
+    Added last, so it runs first: CSRF and CORS see the same path as in
+    development, and the CSRF exemptions still match.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            path = scope["path"]
+            if path == "/api" or path.startswith("/api/"):
+                scope = dict(scope)
+                scope["path"] = path[len("/api"):] or "/"
+                raw = scope.get("raw_path")
+                if raw is not None:
+                    scope["raw_path"] = raw[len(b"/api"):] or b"/"
+                scope[VIA_API_PREFIX] = True
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(ApiPrefix)
 
 
 @app.on_event("startup")
@@ -101,12 +139,13 @@ def root(request: Request):
     the user from handing one kind of caller the other kind's answer.
     """
     headers = {"Vary": "Accept"}
-    if _DIST.is_dir() and "text/html" in request.headers.get("accept", ""):
+    wants_page = "text/html" in request.headers.get("accept", "")
+    if _DIST.is_dir() and wants_page and not request.scope.get(VIA_API_PREFIX):
         return FileResponse(_DIST / "index.html", headers=headers)
     return JSONResponse(
         {
             "name": "CogniSense API",
-            "version": "0.1.0",
+            "version": "1.0.0",
             "status": "ok",
             "disclaimer": NON_DIAGNOSTIC_DISCLAIMER,
         },
@@ -142,8 +181,12 @@ if _DIST.is_dir():
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
 
     @app.get("/{full_path:path}", include_in_schema=False)
-    def serve_spa(full_path: str):
+    def serve_spa(full_path: str, request: Request):
         """Serve a built file, else index.html so client-side routes resolve."""
+        if request.scope.get(VIA_API_PREFIX):
+            # An API call to a path no route has. The page here would reach the
+            # client as a 200 it then fails to parse.
+            raise HTTPException(status_code=404, detail="Not Found")
         candidate = (_DIST / full_path).resolve()
         # `full_path` is attacker-controlled: without this containment check,
         # "../../backend/db/cognisense.db" would serve the database.

@@ -68,6 +68,11 @@ and a desktop client.
   speech had been recorded.
 - The site root answered with the API's JSON in production, so the bare domain
   and the installed app showed JSON instead of the app.
+- Deployed, the web app could not reach its API. It calls `/api/...`, which
+  only the development proxy understood; in production those calls fell
+  through to the page (a GET got HTML, a POST a 405), so no one could even log
+  in. The backend now answers under `/api` itself, and CI checks it in the
+  container.
 - The email-confirmation page could post its single-use token twice, then
   report a successful confirmation as expired.
 - On a phone there was no way to log out or reach account settings.
