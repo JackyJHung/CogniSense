@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, ImageIcon } from "lucide-react";
@@ -14,7 +14,13 @@ import { useAuth } from "@/lib/auth";
 export function EveningPage() {
   const navigate = useNavigate();
   const { user, morning } = useAuth();
-  const startRef = useRef<number>(Date.now());
+  // Response latency is measured from here. Stamped in an effect rather than
+  // during render: render must stay pure (React may run it more than once),
+  // and the clock should start once the cues are actually on screen.
+  const startRef = useRef<number>(0);
+  useEffect(() => {
+    startRef.current = Date.now();
+  }, []);
   const [recalled, setRecalled] = useState("");
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [result, setResult] = useState<EveningCheckin | null>(null);

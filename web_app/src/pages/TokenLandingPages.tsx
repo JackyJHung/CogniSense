@@ -4,7 +4,7 @@
  * session — the token in the link IS the credential. Neither ever displays the
  * token, so it does not end up in a screenshot or a support message.
  */
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, TriangleAlert } from "lucide-react";
 import { CenteredShell } from "@/components/Shell";
@@ -21,30 +21,38 @@ import { useAuth } from "@/lib/auth";
 export function VerifyEmailPage() {
   const [params] = useSearchParams();
   const token = params.get("token") ?? "";
-  const [state, setState] = useState<"working" | "done" | "failed">("working");
-  const [message, setMessage] = useState("");
+  const [outcome, setOutcome] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const verify = useCallback(async () => {
-    if (!token) {
-      setState("failed");
-      setMessage("That link is missing its confirmation code.");
-      return;
-    }
-    try {
-      const r = await api.post<GenericMessage>("/recovery/email/verify", { token });
-      setState("done");
-      setMessage(r.message);
-    } catch (err) {
-      setState("failed");
-      setMessage(
-        err instanceof Error ? err.message : "That link is invalid or has expired.",
-      );
-    }
-  }, [token]);
+  // The token is single-use, so it is sent at most once per token. StrictMode
+  // runs effects twice in development, and the second POST -- finding the token
+  // already consumed -- came back "invalid or expired" and could overwrite the
+  // success that preceded it. For the same reason there is no ignore flag: the
+  // one response that is ever requested must be the one shown.
+  const sentFor = useRef<string | null>(null);
 
   useEffect(() => {
-    void verify();
-  }, [verify]);
+    if (!token || sentFor.current === token) return;
+    sentFor.current = token;
+    api.post<GenericMessage>("/recovery/email/verify", { token }).then(
+      (r) => setOutcome({ ok: true, message: r.message }),
+      (err) =>
+        setOutcome({
+          ok: false,
+          message: err instanceof Error ? err.message : "That link is invalid or has expired.",
+        }),
+    );
+  }, [token]);
+
+  // A link with no token never reaches the server, so it is failed outright
+  // rather than through state.
+  const state: "working" | "done" | "failed" = !token
+    ? "failed"
+    : outcome === null
+      ? "working"
+      : outcome.ok
+        ? "done"
+        : "failed";
+  const message = !token ? "That link is missing its confirmation code." : (outcome?.message ?? "");
 
   return (
     <CenteredShell>

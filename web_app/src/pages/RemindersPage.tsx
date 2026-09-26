@@ -24,6 +24,13 @@ function itemText(item: ReminderItem): string {
   return item.description || item.label || "(untitled)";
 }
 
+function fetchReminderState(userId: number) {
+  return Promise.all([
+    api.get<ReminderItem[]>(`/reminders/${userId}`),
+    api.get<ProspectiveScore>(`/reminders/${userId}/prospective-score`),
+  ]);
+}
+
 export function RemindersPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -43,13 +50,11 @@ export function RemindersPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
 
+  // Re-read after each change the user makes.
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      const [list, sc] = await Promise.all([
-        api.get<ReminderItem[]>(`/reminders/${user.id}`),
-        api.get<ProspectiveScore>(`/reminders/${user.id}/prospective-score`),
-      ]);
+      const [list, sc] = await fetchReminderState(user.id);
       setItems(list);
       setScore(sc);
     } catch (e) {
@@ -57,9 +62,26 @@ export function RemindersPage() {
     }
   }, [user]);
 
+  // First read. Not `void load()`: state set through a callback called from an
+  // effect is what react-hooks/set-state-in-effect rejects, and resolving the
+  // promise here lets the ignore flag drop a response for a previous user.
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!user) return;
+    let ignore = false;
+    fetchReminderState(user.id).then(
+      ([list, sc]) => {
+        if (ignore) return;
+        setItems(list);
+        setScore(sc);
+      },
+      (e) => {
+        if (!ignore) setError(e instanceof Error ? e.message : "Failed to load reminders");
+      },
+    );
+    return () => {
+      ignore = true;
+    };
+  }, [user]);
 
   if (!user) return null;
 

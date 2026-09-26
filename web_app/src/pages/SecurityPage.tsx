@@ -47,9 +47,22 @@ export function SecurityPage() {
     }
   }, []);
 
+  // First read resolved in the effect itself (see RemindersPage for why not
+  // `void refreshStatus()`); the handlers below call refreshStatus after a change.
   useEffect(() => {
-    void refreshStatus();
-  }, [refreshStatus]);
+    let ignore = false;
+    api.get<RecoveryStatus>("/recovery/status").then(
+      (s) => {
+        if (!ignore) setStatus(s);
+      },
+      () => {
+        /* not fatal; the card just shows nothing */
+      },
+    );
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   if (!user) return null;
 

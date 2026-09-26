@@ -11,6 +11,8 @@ import {
   type PushStatus,
 } from "@/lib/push";
 
+const STATUS_ERROR = "Could not read notification status";
+
 export function NotificationSettings({ userId }: { userId: number }) {
   const [status, setStatus] = useState<PushStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -24,13 +26,27 @@ export function NotificationSettings({ userId }: { userId: number }) {
     try {
       setStatus(await getPushStatus(userId));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not read notification status");
+      setError(e instanceof Error ? e.message : STATUS_ERROR);
     }
   }, [userId]);
 
+  // First read, resolved here rather than via refresh() for the same reason as
+  // RemindersPage: no setState reached synchronously from the effect, and a
+  // late answer for a previous userId is dropped.
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let ignore = false;
+    getPushStatus(userId).then(
+      (s) => {
+        if (!ignore) setStatus(s);
+      },
+      (e) => {
+        if (!ignore) setError(e instanceof Error ? e.message : STATUS_ERROR);
+      },
+    );
+    return () => {
+      ignore = true;
+    };
+  }, [userId]);
 
   async function toggle() {
     setBusy(true);

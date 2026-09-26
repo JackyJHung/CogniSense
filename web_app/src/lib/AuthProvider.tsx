@@ -1,28 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   api,
   setUnauthorizedHandler,
   type MorningCheckin,
   type User,
 } from "./api";
-
-interface AuthState {
-  user: User | null;
-  morning: MorningCheckin | null;
-  /** Records a successful login/signup. The session itself lives in an
-   *  HttpOnly cookie the server set on the response, so there is no token to
-   *  hold here -- only the profile, for rendering. */
-  signIn: (user: User) => void;
-  setUser: (u: User | null) => void;
-  setMorning: (m: MorningCheckin | null) => void;
-  logout: () => void;
-  /** True until the stored token has been checked against the server. */
-  loading: boolean;
-}
+import { AuthCtx } from "./auth";
 
 const STORAGE_KEY = "cognisense.session";
-
-const AuthCtx = createContext<AuthState | null>(null);
 
 function readStored<T>(field: "user" | "morning"): T | null {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -100,10 +85,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthCtx.Provider>
   );
-}
-
-export function useAuth(): AuthState {
-  const ctx = useContext(AuthCtx);
-  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
-  return ctx;
 }

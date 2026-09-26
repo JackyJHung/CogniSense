@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Info } from "lucide-react";
 import { Shell } from "@/components/Shell";
@@ -13,7 +13,12 @@ import { useAuth } from "@/lib/auth";
 export function MiddayPage() {
   const navigate = useNavigate();
   const { user, morning } = useAuth();
-  const startRef = useRef<number>(Date.now());
+  // Latency clock. Stamped after mount, not during render, which must stay
+  // pure; addAnother() restarts it for each further entry.
+  const startRef = useRef<number>(0);
+  useEffect(() => {
+    startRef.current = Date.now();
+  }, []);
   const [done, setDone] = useState("");
   const [plan, setPlan] = useState("");
   const [success, setSuccess] = useState(false);
