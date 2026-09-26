@@ -106,6 +106,8 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      # The layer cache only saves time. A failed upload to it (the cache
+      # service rate-limits) must not fail a build that itself succeeded.
       - name: Build image
         uses: docker/build-push-action@v6
         with:
@@ -113,7 +115,7 @@ jobs:
           load: true
           tags: cognisense:ci
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
 
       # Boot with COGNISENSE_ENV=production (baked into the image) and the
       # minimum valid production config. config.validate() refuses to start on
