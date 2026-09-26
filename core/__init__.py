@@ -15,7 +15,7 @@ training scripts and any future analysis all measure things the same way.
   env        Environment capture for the report header.
   report     Contract-enforcing Markdown + JSON renderer.
 
-Origin: C:\\Users\\jjhun\\projects\\cognisense (UCSF-PDGM glioma pipeline). The
+Origin: a separate glioma dMRI research pipeline (UCSF-PDGM). The
 tumour-specific stages -- DWI loading, lesion-aware registration, CSD,
 tractography, connectome construction -- were deliberately left behind; they
 are glioma-specific and were never implemented.

@@ -101,6 +101,8 @@ web_app/.env.*.local
 *.swp
 *.swo
 *~
+# Claude Code's per-machine launch and permission settings.
+.claude/
 
 # === OS noise ===============================================================
 .DS_Store
