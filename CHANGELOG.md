@@ -74,6 +74,10 @@ and a desktop client.
 - Web error messages showed raw JSON such as `{"detail":"Invalid credentials"}`.
 - Signup said demographics never left the device (they are stored with the
   account) and allowed 6-character passwords (the server requires 8).
+- The two production workers could crash the server on its first start. Both
+  created the database tables at once, the loser failed with "table users
+  already exists", and gunicorn stops everything when a worker fails to boot.
+  Schema creation now runs under a lock.
 - Behind docker compose, a reverse proxy's requests reach the app from the
   network gateway rather than 127.0.0.1. The compose subnet is now pinned, so
   the production template can trust that address, and the per-IP login throttle
