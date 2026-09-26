@@ -56,6 +56,10 @@ and a desktop client.
   check-in count behind every later score, and shown as the day's result. A
   second attempt is now answered with the first result (409), as the morning
   check-in already was.
+- The web app remembered the morning check-in in the browser instead of
+  asking the server, so on a new device the evening test said there was no
+  morning check-in, and on a device last used yesterday it tested the evening
+  against yesterday's cues.
 - The evening check-in stored and displayed a speech biomarker of 0.75 when no
   speech had been recorded.
 - The site root answered with the API's JSON in production, so the bare domain

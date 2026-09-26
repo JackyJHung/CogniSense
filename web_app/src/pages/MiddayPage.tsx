@@ -9,10 +9,13 @@ import { Label } from "@/components/ui/Label";
 import { Disclaimer } from "@/components/Disclaimer";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useTodaysMorning } from "@/lib/useTodaysMorning";
 
 export function MiddayPage() {
   const navigate = useNavigate();
-  const { user, morning } = useAuth();
+  const { user } = useAuth();
+  // Links the entry to today's morning when there is one; the link is optional.
+  const { morning } = useTodaysMorning(user?.id);
   // Latency clock. Stamped after mount, not during render, which must stay
   // pure; addAnother() restarts it for each further entry.
   const startRef = useRef<number>(0);

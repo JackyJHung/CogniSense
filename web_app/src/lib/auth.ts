@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { MorningCheckin, User } from "./api";
+import type { User } from "./api";
 
 /* The context and its hook live apart from <AuthProvider> (AuthProvider.tsx) so
  * that each module exports one kind of thing. React Fast Refresh can only
@@ -8,13 +8,11 @@ import type { MorningCheckin, User } from "./api";
 
 export interface AuthState {
   user: User | null;
-  morning: MorningCheckin | null;
   /** Records a successful login/signup. The session itself lives in an
    *  HttpOnly cookie the server set on the response, so there is no token to
    *  hold here -- only the profile, for rendering. */
   signIn: (user: User) => void;
   setUser: (u: User | null) => void;
-  setMorning: (m: MorningCheckin | null) => void;
   logout: () => void;
   /** True until the stored token has been checked against the server. */
   loading: boolean;

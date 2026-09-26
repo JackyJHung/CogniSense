@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/Label";
 import { Disclaimer } from "@/components/Disclaimer";
 import { api, ApiError, type EveningCheckin } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useTodaysMorning } from "@/lib/useTodaysMorning";
 
 type ConflictDetail = {
   code?: string;
@@ -19,14 +20,17 @@ type ConflictDetail = {
 
 export function EveningPage() {
   const navigate = useNavigate();
-  const { user, morning } = useAuth();
+  const { user } = useAuth();
+  const today = useTodaysMorning(user?.id);
+  const morning = today.morning;
   // Response latency is measured from here. Stamped in an effect rather than
   // during render: render must stay pure (React may run it more than once),
-  // and the clock should start once the cues are actually on screen.
+  // and the clock should start once the cues are actually on screen -- which
+  // is when today's morning check-in has arrived from the server.
   const startRef = useRef<number>(0);
   useEffect(() => {
-    startRef.current = Date.now();
-  }, []);
+    if (morning) startRef.current = Date.now();
+  }, [morning]);
   const [recalled, setRecalled] = useState("");
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [result, setResult] = useState<EveningCheckin | null>(null);
@@ -36,6 +40,14 @@ export function EveningPage() {
 
   if (!user) return null;
 
+  if (today.loading) {
+    return (
+      <Shell>
+        <div className="h-48 animate-pulse rounded-2xl bg-white/40 dark:bg-white/5" />
+      </Shell>
+    );
+  }
+
   if (!morning) {
     return (
       <Shell>
@@ -44,15 +56,20 @@ export function EveningPage() {
         </Button>
         <Card>
           <CardHeader>
-            <CardTitle>No morning check-in yet</CardTitle>
+            <CardTitle>{today.error ? "Couldn't load today's check-in" : "No morning check-in yet"}</CardTitle>
             <CardDescription>
-              You need to complete the morning check-in first so we have associations to test.
+              {today.error ??
+                "You need to complete the morning check-in first so we have associations to test."}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link to="/morning">
-              <Button>Go to morning check-in</Button>
-            </Link>
+            {today.error ? (
+              <Button onClick={() => window.location.reload()}>Try again</Button>
+            ) : (
+              <Link to="/morning">
+                <Button>Go to morning check-in</Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
         <Disclaimer />

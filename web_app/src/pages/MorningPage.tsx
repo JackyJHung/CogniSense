@@ -18,7 +18,7 @@ type ConflictDetail = {
 
 export function MorningPage() {
   const navigate = useNavigate();
-  const { user, setMorning } = useAuth();
+  const { user } = useAuth();
   const [plans, setPlans] = useState("");
   const [result, setResult] = useState<MorningCheckin | null>(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
@@ -36,7 +36,6 @@ export function MorningPage() {
         if (cancelled) return;
         setResult(existing);
         setAlreadySubmitted(true);
-        setMorning(existing);
       } catch (err) {
         // 404 = no morning yet today, expected — anything else is a real error
         if (!(err instanceof ApiError && err.status === 404) && !cancelled) {
@@ -47,7 +46,7 @@ export function MorningPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user, setMorning]);
+  }, [user]);
 
   if (!user) return null;
 
@@ -60,14 +59,12 @@ export function MorningPage() {
         user_id: user.id,
         planned_activities: plans.trim(),
       });
-      setMorning(morning);
       setResult(morning);
     } catch (err) {
       // Handle the "already submitted today" race condition
       if (err instanceof ApiError && err.status === 409) {
         const detail = err.detail() as ConflictDetail | null;
         if (detail?.existing) {
-          setMorning(detail.existing);
           setResult(detail.existing);
           setAlreadySubmitted(true);
         } else {

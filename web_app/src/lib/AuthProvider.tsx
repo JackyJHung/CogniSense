@@ -1,39 +1,33 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import {
-  api,
-  setUnauthorizedHandler,
-  type MorningCheckin,
-  type User,
-} from "./api";
+import { api, setUnauthorizedHandler, type User } from "./api";
 import { AuthCtx } from "./auth";
 import { deviceTimeZone } from "./timezone";
 
 const STORAGE_KEY = "cognisense.session";
 
-function readStored<T>(field: "user" | "morning"): T | null {
+/* Only the profile is cached, for a first render before /users/me answers.
+ * Today's morning check-in used to be cached here too; see useTodaysMorning
+ * for why the pages now ask the server instead. */
+function readStoredUser(): User | null {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
-    return (JSON.parse(raw)[field] as T) ?? null;
+    return (JSON.parse(raw).user as User) ?? null;
   } catch {
     return null;
   }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => readStored<User>("user"));
-  const [morning, setMorning] = useState<MorningCheckin | null>(() =>
-    readStored<MorningCheckin>("morning"),
-  );
+  const [user, setUser] = useState<User | null>(readStoredUser);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ user, morning }));
-  }, [user, morning]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ user }));
+  }, [user]);
 
   const clearLocal = useCallback(() => {
     setUser(null);
-    setMorning(null);
     // Only cached profile data is dropped here. The session cookie is HttpOnly
     // and can only be cleared by the server, which /users/logout does.
     localStorage.removeItem(STORAGE_KEY);
@@ -97,9 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearLocal]);
 
   return (
-    <AuthCtx.Provider
-      value={{ user, morning, signIn, setUser, setMorning, logout, loading }}
-    >
+    <AuthCtx.Provider value={{ user, signIn, setUser, logout, loading }}>
       {children}
     </AuthCtx.Provider>
   );
