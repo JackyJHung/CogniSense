@@ -128,11 +128,19 @@ npm run dev          # http://localhost:5173
 Override the backend URL with `VITE_BACKEND_URL` in `web_app/.env.local` if needed.
 
 ### Desktop app (Python-only — Tkinter)
-No extra dependencies; uses the same `backend/.venv`.
+No extra dependencies; uses the same `backend/.venv`. The backend must be
+running; point the app elsewhere with `COGNISENSE_BACKEND` (default
+`http://127.0.0.1:8000`).
 ```bash
 cd desktop_app
 python main.py
 ```
+It authenticates with the bearer token from login, held in memory only, so
+closing the app discards it and **Log out** revokes it on the server. When a
+session ends — idle expiry, a password change, or "sign out everywhere" on
+another device — the next action returns to the login screen and says why.
+All HTTP goes through `desktop_app/api_client.py`, which
+`backend/tests/test_desktop_client.py` drives against the real API.
 
 ### Mobile app
 ```bash
