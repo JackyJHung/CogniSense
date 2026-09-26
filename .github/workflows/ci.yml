@@ -61,7 +61,27 @@ jobs:
         run: python -m app.ml.train_models
 
       - name: Tests
-        run: python -m pytest tests -q
+        run: |
+          set -o pipefail
+          python -m pytest tests -q -rfE --tb=short 2>&1 | tee pytest.log
+
+      # Reading a job's log takes a GitHub login; annotations on the commit are
+      # public. So a failure also posts pytest's own report as annotations, and
+      # anyone can see which test failed and why.
+      - name: Annotate test failures
+        if: failure()
+        run: |
+          python - <<'EOF'
+          import pathlib
+          path = pathlib.Path("pytest.log")
+          log = path.read_text(errors="replace") if path.exists() else "pytest.log was not written"
+          marks = [i for i in (log.find("= ERRORS ="), log.find("= FAILURES =")) if i >= 0]
+          report = log[min(marks):] if marks else log[-9000:]
+          def escape(s):
+              return s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          for n, start in enumerate(range(0, min(len(report), 27000), 3000)):
+              print(f"::error title=pytest report, part {n + 1}::{escape(report[start:start + 3000])}")
+          EOF
 
       # Nested CV + permuted-label, baseline and confound controls. A failed
       # control exits non-zero and fails the build.
