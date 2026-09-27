@@ -18,18 +18,18 @@ Alzheimer's disease and related dementias (ADRD).
 > diagnostic device**.
 
 <p align="center">
-  <img src="docs/screenshots/report.png" width="70%" alt="The risk report: the recent average with its 95% range, peer benchmarks, and a 30-day trend chart of daily scores with the 7-day average, its 95% band and the personal baseline">
+  <img src="docs/screenshots/report.png" width="70%" alt="The report on a desktop: the recent average with its 95% range, peer benchmarks, and a 30-day trend chart of daily scores with the 7-day average, its 95% band and the personal baseline">
   &nbsp;
-  <img src="docs/screenshots/phone-dark.png" width="24%" alt="The same trend card on a phone in dark mode">
+  <img src="docs/screenshots/phone-dark.png" width="24%" alt="The Today screen on a phone in dark mode: the day's check-ins as a grouped list, above a tab bar">
 </p>
-<p align="center"><sub>The risk report and trend, on a desktop and on a phone in dark mode. Demo account, synthetic data.</sub></p>
+<p align="center"><sub>The report on a desktop, and Today on a phone in dark mode. Demo account, synthetic data.</sub></p>
 
 > **Important:** CogniSense is a research and self-tracking tool. It is **NOT** a medical diagnostic device and does not replace professional evaluation. Any output from this app is a suggestion, not professional advice. If you or a loved one are experiencing worsening memory concerns, please consult a licensed physician or neurologist.
 
 ## What's in v1.0
 
 <p align="center">
-  <img src="docs/screenshots/dashboard.png" width="80%" alt="The dashboard: morning, midday and evening check-ins, the risk report, daily suggestions and things to remember">
+  <img src="docs/screenshots/dashboard.png" width="80%" alt="Today on a desktop: the morning, midday and evening check-ins, the report, daily suggestions and things to remember, with the sidebar">
 </p>
 
 1. **Onboarding** — age, gender, race/ethnicity, wake and sleep times, and a time zone taken from the device
@@ -43,7 +43,8 @@ Alzheimer's disease and related dementias (ADRD).
 9. **Reminder notifications** — Web Push that arrives with the app closed, with quiet hours and a cooldown
 10. **Accounts** — revocable sessions, rate-limited login, password change, recovery codes, and email recovery when SMTP is configured
 11. **Two clients** — a web app that installs to a phone's Home Screen, and a Tkinter desktop app
-12. **Safety layer** — the non-diagnostic disclaimer on every screen and report
+12. **An Apple-style interface** — built to Apple's Human Interface Guidelines: the system font (SF Pro on Apple devices), system colours in light and dark, large titles, grouped lists, a tab bar on phones and a sidebar on larger screens
+13. **Safety layer** — the non-diagnostic disclaimer on every screen and report
 
 **Speech scoring is backend-only for now.** A PyTorch 1D-CNN over MFCC features
 scores a recording uploaded to `POST /checkins/morning/{id}/audio`, but neither
