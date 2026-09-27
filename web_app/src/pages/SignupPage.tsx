@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CenteredShell } from "@/components/Shell";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -86,89 +86,85 @@ export function SignupPage() {
   };
 
   return (
-    <CenteredShell>
-      <Card>
-        <CardHeader>
-          <CardTitle>Create your account</CardTitle>
-          <CardDescription>
-            Your age, gender and ethnicity are stored with your account and used
-            only to compare your scores against matching research benchmarks.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2 flex flex-col gap-1.5">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  value={form.username}
-                  onChange={(e) => update("username", e.target.value)}
-                  required
-                  minLength={3}
-                />
-              </div>
-              <div className="col-span-2 flex flex-col gap-1.5">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => update("password", e.target.value)}
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                />
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  At least 8 characters.
-                </p>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="age">Age</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  min={18}
-                  max={120}
-                  value={form.age}
-                  onChange={(e) => update("age", e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="gender">Gender</Label>
-                <Select id="gender" value={form.gender} onChange={(e) => update("gender", e.target.value as typeof form.gender)}>
-                  {GENDERS.map((g) => <option key={g} value={g}>{GENDER_LABELS[g]}</option>)}
-                </Select>
-              </div>
-              <div className="col-span-2 flex flex-col gap-1.5">
-                <Label htmlFor="race">Race / ethnicity</Label>
-                <Select id="race" value={form.race} onChange={(e) => update("race", e.target.value as typeof form.race)}>
-                  {RACES.map((r) => <option key={r} value={r}>{RACE_LABELS[r]}</option>)}
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="wake_time">Wake time</Label>
-                <Input id="wake_time" type="time" value={form.wake_time} onChange={(e) => update("wake_time", e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="sleep_time">Sleep time</Label>
-                <Input id="sleep_time" type="time" value={form.sleep_time} onChange={(e) => update("sleep_time", e.target.value)} />
-              </div>
+    <CenteredShell
+      title="Create Your Account"
+      subtitle="Your age, gender and ethnicity are stored with your account and used only to compare your scores against matching research benchmarks."
+    >
+      <form onSubmit={onSubmit}>
+        <Card>
+          <CardContent className="grid grid-cols-2 gap-x-3 gap-y-4 pt-5">
+            <div className="col-span-2 flex flex-col gap-1.5">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                value={form.username}
+                onChange={(e) => update("username", e.target.value)}
+                required
+                minLength={3}
+              />
             </div>
-            {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
-            <Button type="submit" loading={loading} size="lg" className="mt-2">
-              Create account
-            </Button>
-            <p className="text-center text-sm text-slate-500 dark:text-slate-400">
-              Already have one?{" "}
-              <Link to="/login" className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
-                Log in
-              </Link>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+            <div className="col-span-2 flex flex-col gap-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={form.password}
+                onChange={(e) => update("password", e.target.value)}
+                required
+                minLength={8}
+                autoComplete="new-password"
+              />
+              <p className="px-1 text-footnote text-label-2">At least 8 characters.</p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="age">Age</Label>
+              <Input
+                id="age"
+                type="number"
+                inputMode="numeric"
+                min={18}
+                max={120}
+                value={form.age}
+                onChange={(e) => update("age", e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="gender">Gender</Label>
+              <Select id="gender" value={form.gender} onChange={(e) => update("gender", e.target.value as typeof form.gender)}>
+                {GENDERS.map((g) => <option key={g} value={g}>{GENDER_LABELS[g]}</option>)}
+              </Select>
+            </div>
+            <div className="col-span-2 flex flex-col gap-1.5">
+              <Label htmlFor="race">Race / ethnicity</Label>
+              <Select id="race" value={form.race} onChange={(e) => update("race", e.target.value as typeof form.race)}>
+                {RACES.map((r) => <option key={r} value={r}>{RACE_LABELS[r]}</option>)}
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="wake_time">Wake time</Label>
+              <Input id="wake_time" type="time" value={form.wake_time} onChange={(e) => update("wake_time", e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="sleep_time">Sleep time</Label>
+              <Input id="sleep_time" type="time" value={form.sleep_time} onChange={(e) => update("sleep_time", e.target.value)} />
+            </div>
+          </CardContent>
+        </Card>
+        {error && <p className="mt-3 px-1 text-subhead text-danger">{error}</p>}
+        <Button type="submit" loading={loading} size="lg" className="mt-5 w-full">
+          Create Account
+        </Button>
+      </form>
+      <p className="mt-5 text-center text-subhead text-label-2">
+        Already have one?{" "}
+        <Link to="/login" className="text-link hover:underline">
+          Log in
+        </Link>
+      </p>
       <Disclaimer />
     </CenteredShell>
   );

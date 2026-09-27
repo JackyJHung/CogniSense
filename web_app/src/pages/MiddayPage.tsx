@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Info } from "lucide-react";
+import { Check } from "lucide-react";
 import { Shell } from "@/components/Shell";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -61,43 +61,29 @@ export function MiddayPage() {
   };
 
   return (
-    <Shell>
-      <Button variant="ghost" onClick={() => navigate("/dashboard")} className="mb-6">
-        <ArrowLeft className="h-4 w-4" /> Back to dashboard
-      </Button>
-      <Card>
-        <CardHeader>
-          <CardTitle>Midday check-in</CardTitle>
-          <CardDescription>A light recall prompt. No grading — just for tracking.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex items-start gap-2 rounded-xl bg-brand-100/60 dark:bg-brand-700/20 px-3 py-2 text-xs text-brand-800 dark:text-brand-200">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <p>
-              You can submit as many midday check-ins as you like throughout the day.
-              Each one is saved as a separate entry — earlier submissions are kept, not replaced.
-            </p>
+    <Shell
+      title="Midday check-in"
+      back={{ to: "/dashboard", label: "Today" }}
+      subtitle="A light recall prompt. No grading, just for tracking."
+    >
+      {success ? (
+        <Card className="flex flex-col items-center px-6 py-10 text-center">
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-ios-green text-white">
+            <Check aria-hidden="true" className="h-9 w-9" strokeWidth={3} />
+          </span>
+          <p className="mt-4 text-title3 font-semibold text-label">Saved as entry #{submittedCount} today.</p>
+          <p className="mt-1 text-subhead text-label-2">Your earlier midday entries are still on record.</p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Button variant="secondary" onClick={addAnother}>
+              Add Another
+            </Button>
+            <Button onClick={() => navigate("/dashboard")}>Done</Button>
           </div>
-          {success ? (
-            <div className="flex flex-col items-center gap-4 py-8 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
-                <CheckCircle2 className="h-8 w-8" />
-              </div>
-              <p className="text-lg font-medium text-slate-900 dark:text-slate-100">
-                Saved as entry #{submittedCount} today.
-              </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Your earlier midday entries are still on record.
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <Button variant="secondary" onClick={addAnother}>
-                  Add another check-in
-                </Button>
-                <Button onClick={() => navigate("/dashboard")}>Back to dashboard</Button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={submit} className="flex flex-col gap-4">
+        </Card>
+      ) : (
+        <form onSubmit={submit}>
+          <Card>
+            <CardContent className="flex flex-col gap-4 pt-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="done">What have you done so far today?</Label>
                 <Textarea id="done" value={done} onChange={(e) => setDone(e.target.value)} required rows={4} />
@@ -106,14 +92,18 @@ export function MiddayPage() {
                 <Label htmlFor="plan">What do you still plan to do?</Label>
                 <Textarea id="plan" value={plan} onChange={(e) => setPlan(e.target.value)} rows={3} />
               </div>
-              {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
-              <Button type="submit" loading={loading} size="lg">
-                Submit
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+          <p className="px-4 pt-1.5 text-footnote text-label-2">
+            You can submit as many midday check-ins as you like. Each is saved as a separate
+            entry; earlier ones are kept, not replaced.
+          </p>
+          {error && <p className="mt-3 px-1 text-subhead text-danger">{error}</p>}
+          <Button type="submit" loading={loading} size="lg" className="mt-5 w-full sm:w-auto">
+            Submit
+          </Button>
+        </form>
+      )}
       <Disclaimer />
     </Shell>
   );

@@ -1,74 +1,178 @@
 @import "tailwindcss";
 
+/* Apple's design language, from the Human Interface Guidelines: the system
+ * font (SF Pro wherever the device has it), the system colours with their
+ * dark-mode pairs, grouped backgrounds, and translucent bars.
+ *
+ * Colours are Apple's published iOS values. Three are deliberately not the
+ * default shade, because the default fails WCAG AA as text on white:
+ * secondary labels, red and green text use the "Increase Contrast" variants,
+ * and link blue is apple.com's own #0066CC. Filled buttons use apple.com's
+ * #0071E3, which carries white text at 4.7:1.
+ *
+ * Every token switches with prefers-color-scheme, so components write
+ * `text-label` rather than a light and a dark class. */
+
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Apple Health's numerals: SF Pro Rounded on Apple devices. */
+  --font-rounded: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont,
+    "Inter", "Segoe UI", sans-serif;
 
-  /* Brand palette — light-blue / sky tones */
-  --color-brand-50:  oklch(0.98 0.02 225);
-  --color-brand-100: oklch(0.94 0.05 225);
-  --color-brand-200: oklch(0.88 0.09 225);
-  --color-brand-300: oklch(0.81 0.13 228);
-  --color-brand-400: oklch(0.74 0.16 230);
-  --color-brand-500: oklch(0.68 0.18 230);
-  --color-brand-600: oklch(0.58 0.18 235);
-  --color-brand-700: oklch(0.48 0.16 240);
-  --color-brand-800: oklch(0.36 0.13 245);
-  --color-brand-900: oklch(0.24 0.08 248);
+  /* The iOS type ramp (Dynamic Type, default size). */
+  --text-large-title: 2.125rem;
+  --text-large-title--line-height: 2.5625rem;
+  --text-title1: 1.75rem;
+  --text-title1--line-height: 2.125rem;
+  --text-title2: 1.375rem;
+  --text-title2--line-height: 1.75rem;
+  --text-title3: 1.25rem;
+  --text-title3--line-height: 1.5625rem;
+  --text-body: 1.0625rem;
+  --text-body--line-height: 1.375rem;
+  --text-callout: 1rem;
+  --text-callout--line-height: 1.3125rem;
+  --text-subhead: 0.9375rem;
+  --text-subhead--line-height: 1.25rem;
+  --text-footnote: 0.8125rem;
+  --text-footnote--line-height: 1.125rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-caption2: 0.6875rem;
+  --text-caption2--line-height: 0.8125rem;
+}
 
-  /* Accent alias kept = brand so legacy class names still work */
-  --color-accent-400: var(--color-brand-300);
-  --color-accent-500: var(--color-brand-400);
+@theme inline {
+  --color-label: var(--label);
+  --color-label-2: var(--label-2);
+  --color-label-3: var(--label-3);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fill: var(--fill);
+  --color-fill-2: var(--fill-2);
+  --color-separator: var(--separator);
+  --color-bar: var(--bar);
+  --color-tint: var(--tint);
+  --color-link: var(--link);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-selected: var(--selected);
+
+  --color-ios-blue: var(--ios-blue);
+  --color-ios-green: var(--ios-green);
+  --color-ios-red: var(--ios-red);
+  --color-ios-orange: var(--ios-orange);
+  --color-ios-yellow: var(--ios-yellow);
+  --color-ios-indigo: var(--ios-indigo);
+  --color-ios-purple: var(--ios-purple);
+  --color-ios-pink: var(--ios-pink);
+  --color-ios-teal: var(--ios-teal);
+  --color-ios-gray: var(--ios-gray);
 }
 
 :root {
   color-scheme: light dark;
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+
+  --label: #000000;
+  --label-2: #6c6c70;
+  --label-3: #8e8e93;
+  --canvas: #f2f2f7;
+  --surface: #ffffff;
+  --surface-2: #f2f2f7;
+  --fill: rgb(118 118 128 / 0.12);
+  --fill-2: rgb(116 116 128 / 0.08);
+  --separator: rgb(60 60 67 / 0.29);
+  --bar: rgb(249 249 249 / 0.88);
+  --tint: #0071e3;
+  --link: #0066cc;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --danger: #d70015;
+  --success: #248a3d;
+  --warning: #c93400;
+  /* The selected segment of a segmented control. */
+  --selected: #ffffff;
+
+  --ios-blue: #007aff;
+  --ios-green: #34c759;
+  --ios-red: #ff3b30;
+  --ios-orange: #ff9500;
+  --ios-yellow: #ffcc00;
+  --ios-indigo: #5856d6;
+  --ios-purple: #af52de;
+  --ios-pink: #ff2d55;
+  --ios-teal: #30b0c7;
+  --ios-gray: #8e8e93;
 }
 
-html, body, #root {
-  height: 100%;
-}
-
-/* Light mode — white surfaces with a subtle sky wash */
-body {
-  margin: 0;
-  background:
-    radial-gradient(900px 600px at 0% -10%,
-      color-mix(in oklch, var(--color-brand-200) 70%, transparent),
-      transparent 60%),
-    radial-gradient(700px 500px at 100% 0%,
-      color-mix(in oklch, var(--color-brand-100) 80%, transparent),
-      transparent 55%),
-    linear-gradient(180deg, #ffffff 0%, #f3f8fd 100%);
-  color: #0a0e1a;
-}
-
-/* Dark mode — pure black with a quiet blue glow */
 @media (prefers-color-scheme: dark) {
-  body {
-    background:
-      radial-gradient(1100px 700px at 0% -10%,
-        color-mix(in oklch, var(--color-brand-500) 25%, transparent),
-        transparent 65%),
-      radial-gradient(800px 600px at 100% 10%,
-        color-mix(in oklch, var(--color-brand-700) 20%, transparent),
-        transparent 60%),
-      #000000;
-    color: #f8fafc;
+  :root {
+    --label: #ffffff;
+    --label-2: rgb(235 235 245 / 0.6);
+    --label-3: rgb(235 235 245 / 0.38);
+    --canvas: #000000;
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --fill: rgb(118 118 128 / 0.24);
+    --fill-2: rgb(118 118 128 / 0.18);
+    --separator: rgb(84 84 88 / 0.65);
+    --bar: rgb(22 22 23 / 0.86);
+    --tint: #2997ff;
+    --link: #2997ff;
+    --accent: #0071e3;
+    --accent-hover: #0077ed;
+    --danger: #ff6961;
+    --success: #30db5b;
+    --warning: #ffb340;
+    --selected: #636366;
+
+    --ios-blue: #0a84ff;
+    --ios-green: #30d158;
+    --ios-red: #ff453a;
+    --ios-orange: #ff9f0a;
+    --ios-yellow: #ffd60a;
+    --ios-indigo: #5e5ce6;
+    --ios-purple: #bf5af2;
+    --ios-pink: #ff375f;
+    --ios-teal: #40c8e0;
+    --ios-gray: #8e8e93;
   }
 }
 
-/* Scrollbar */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklch, var(--color-brand-400) 50%, transparent) transparent;
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
-/* Selection */
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--label);
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  line-height: 1.47;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Taps flash nothing: pressed states are drawn by the controls themselves. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The up-and-down chevron of an iOS pop-up button, on <Select>. */
+.select-chevrons {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238e8e93' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M5 6.5 8 3.5l3 3M5 9.5l3 3 3-3'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+}
+
 ::selection {
-  background: color-mix(in oklch, var(--color-brand-400) 35%, transparent);
+  background: color-mix(in srgb, var(--tint) 28%, transparent);
   color: inherit;
 }

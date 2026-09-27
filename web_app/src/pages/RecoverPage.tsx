@@ -67,7 +67,7 @@ export function RecoverPage() {
   };
 
   return (
-    <CenteredShell>
+    <CenteredShell title="Reset Your Password" subtitle="Get back into your account with an emailed link or a recovery code.">
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Email me a reset link</CardTitle>
@@ -89,7 +89,7 @@ export function RecoverPage() {
               />
             </div>
             {linkNote && (
-              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              <p className="text-subhead text-label-2">
                 {linkNote}
               </p>
             )}
@@ -131,7 +131,7 @@ export function RecoverPage() {
                 onChange={(e) => setCode(e.target.value)}
                 required
               />
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-footnote text-label-2">
                 Capitals and dashes don't matter.
               </p>
             </div>
@@ -159,20 +159,20 @@ export function RecoverPage() {
               />
             </div>
 
-            {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+            {error && <p className="text-subhead text-danger">{error}</p>}
 
             <Button type="submit" loading={loading}>
               Reset password
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-6 text-center text-subhead text-label-2">
             Remembered it?{" "}
-            <Link to="/login" className="font-medium text-brand-600 dark:text-brand-400">
+            <Link to="/login" className="text-link">
               Sign in
             </Link>
           </p>
-          <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+          <p className="mt-3 text-footnote text-label-2">
             No codes and no confirmed email? Then the account cannot be
             recovered — there is nothing left that proves it is yours. Sign up
             again, and add a recovery email or generate codes straight away.

@@ -34,6 +34,10 @@ and a desktop client.
 - An installable web app (manifest, icons, Apple web-app tags). On iOS this is
   what makes push possible.
 - A Tkinter desktop client.
+- An interface built to Apple's Human Interface Guidelines: the system font,
+  system colours in light and dark mode, large titles that hand over to a
+  translucent navigation bar, grouped lists, a segmented control, a tab bar on
+  phones and a sidebar on larger screens. The app icons match.
 - The validation harness `python -m app.ml.validate`: user-level nested CV with
   permuted-label, baseline and confound controls.
 - Production deployment: a Docker image serving the API and the built web app

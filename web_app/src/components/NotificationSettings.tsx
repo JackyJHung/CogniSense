@@ -83,11 +83,11 @@ export function NotificationSettings({ userId }: { userId: number }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
+        <CardTitle className="text-body flex items-center gap-2">
           {status?.enabled ? (
-            <Bell className="h-4 w-4 text-brand-500" />
+            <Bell className="h-4 w-4 text-ios-red" strokeWidth={2.5} />
           ) : (
-            <BellOff className="h-4 w-4 text-slate-400" />
+            <BellOff className="h-4 w-4 text-label-3" strokeWidth={2.5} />
           )}
           Reminder notifications
         </CardTitle>
@@ -97,37 +97,37 @@ export function NotificationSettings({ userId }: { userId: number }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {blocker && (
-          <p className="flex items-start gap-2 rounded-xl bg-amber-500/10 px-4 py-3 text-sm leading-relaxed text-amber-900 dark:text-amber-200">
-            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <p className="flex items-start gap-2 rounded-xl bg-ios-orange/12 px-4 py-3 text-subhead text-label">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-ios-orange" />
             {blocker}
           </p>
         )}
 
         {status && !blocker && (
-          <dl className="grid grid-cols-2 gap-3 text-sm">
+          <dl className="grid grid-cols-2 gap-3 text-subhead">
             <div>
-              <dt className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <dt className="text-caption font-semibold uppercase text-label-2">
                 Status
               </dt>
-              <dd className="font-medium text-slate-900 dark:text-slate-100">
+              <dd className="font-medium text-label">
                 {status.enabled
                   ? `On · ${status.devices} device${status.devices === 1 ? "" : "s"}`
                   : "Off"}
               </dd>
             </div>
             <div>
-              <dt className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <dt className="text-caption font-semibold uppercase text-label-2">
                 At most
               </dt>
-              <dd className="font-medium text-slate-900 dark:text-slate-100">
+              <dd className="font-medium text-label">
                 one every {status.cooldown_hours}h
               </dd>
             </div>
             <div className="col-span-2">
-              <dt className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <dt className="text-caption font-semibold uppercase text-label-2">
                 Quiet hours
               </dt>
-              <dd className="text-slate-700 dark:text-slate-300">
+              <dd className="text-label">
                 {status.quiet_hours}
                 {!status.currently_awake && " — quiet right now"}
               </dd>
@@ -136,7 +136,7 @@ export function NotificationSettings({ userId }: { userId: number }) {
         )}
 
         {status && !status.scheduler_running && (
-          <p className="rounded-xl bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+          <p className="rounded-xl bg-ios-orange/12 px-4 py-3 text-footnote text-label">
             The reminder scheduler is switched off on the server, so scheduled
             prompts won't be sent. Test notifications still work.
           </p>
@@ -161,10 +161,10 @@ export function NotificationSettings({ userId }: { userId: number }) {
           )}
         </div>
 
-        {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
-        {note && <p className="text-sm text-emerald-700 dark:text-emerald-300">{note}</p>}
+        {error && <p className="text-subhead text-danger">{error}</p>}
+        {note && <p className="text-subhead text-success">{note}</p>}
 
-        <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+        <p className="text-footnote text-label-2">
           You can close this page and still be reminded. Two things do have to
           keep running: the CogniSense server, and your browser. On a phone the
           browser can be fully closed. On a desktop, Chrome only delivers

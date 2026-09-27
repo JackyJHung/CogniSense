@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CenteredShell } from "@/components/Shell";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
@@ -40,13 +40,9 @@ export function LoginPage() {
   };
 
   return (
-    <CenteredShell>
+    <CenteredShell subtitle="Log in to continue your daily check-in.">
       <Card>
-        <CardHeader>
-          <CardTitle>Welcome back</CardTitle>
-          <CardDescription>Sign in to continue your daily check-in.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-5">
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="username">Username</Label>
@@ -54,6 +50,8 @@ export function LoginPage() {
                 id="username"
                 autoFocus
                 autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
@@ -70,26 +68,24 @@ export function LoginPage() {
                 required
               />
             </div>
-            {error && (
-              <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>
-            )}
-            <Button type="submit" loading={loading} size="lg" className="mt-2">
-              Log in
+            {error && <p className="px-1 text-subhead text-danger">{error}</p>}
+            <Button type="submit" loading={loading} size="lg" className="mt-1 w-full">
+              Log In
             </Button>
-            <p className="text-center text-sm text-slate-500 dark:text-slate-400">
-              No account?{" "}
-              <Link to="/signup" className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
-                Create one
-              </Link>
-            </p>
-            <p className="text-center text-sm text-slate-500 dark:text-slate-400">
-              <Link to="/recover" className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
-                Forgotten your password?
-              </Link>
-            </p>
           </form>
         </CardContent>
       </Card>
+      <div className="mt-5 flex flex-col items-center gap-2 text-subhead">
+        <Link to="/recover" className="text-link hover:underline">
+          Forgotten your password?
+        </Link>
+        <p className="text-label-2">
+          No account?{" "}
+          <Link to="/signup" className="text-link hover:underline">
+            Create one
+          </Link>
+        </p>
+      </div>
       <Disclaimer />
     </CenteredShell>
   );

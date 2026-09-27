@@ -47,8 +47,8 @@ export function TimeZoneSettings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Globe className="h-4 w-4 text-brand-500" /> Time zone
+        <CardTitle className="text-body flex items-center gap-2">
+          <Globe className="h-4 w-4 text-ios-blue" strokeWidth={2.5} /> Time zone
         </CardTitle>
         <CardDescription>
           Each day, and each morning check-in, starts at midnight in this time
@@ -56,7 +56,7 @@ export function TimeZoneSettings() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-slate-700 dark:text-slate-300">
+        <p className="text-subhead text-label">
           {saved ? (
             <>
               Your days follow <strong>{label(saved)}</strong>.
@@ -69,7 +69,7 @@ export function TimeZoneSettings() {
         </p>
 
         {device && device !== saved && (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-sm leading-relaxed text-amber-900 dark:text-amber-200">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl bg-ios-orange/12 px-4 py-3 text-subhead text-label">
             <span>
               This device is set to <strong>{label(device)}</strong>.
             </span>
@@ -90,9 +90,9 @@ export function TimeZoneSettings() {
               ))}
             </Select>
           </div>
-          {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
-          {note && <p className="text-sm text-emerald-700 dark:text-emerald-300">{note}</p>}
-          <Button type="submit" variant="secondary" loading={busy} disabled={choice === saved}>
+          {error && <p className="text-subhead text-danger">{error}</p>}
+          {note && <p className="text-subhead text-success">{note}</p>}
+          <Button type="submit" variant="secondary" loading={busy} disabled={choice === saved} className="sm:self-start">
             Save time zone
           </Button>
         </form>

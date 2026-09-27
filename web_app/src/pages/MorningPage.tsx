@@ -1,14 +1,17 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, ImageIcon, Lock } from "lucide-react";
+import { ImageIcon, Lock } from "lucide-react";
 import { Shell } from "@/components/Shell";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/Card";
+import { GroupedList, ListRow } from "@/components/ui/List";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Input";
 import { Disclaimer } from "@/components/Disclaimer";
 import { api, ApiError, type MorningCheckin } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+
+const TODAY = { to: "/dashboard", label: "Today" };
 
 type ConflictDetail = {
   code?: string;
@@ -80,34 +83,24 @@ export function MorningPage() {
 
   if (checkingExisting) {
     return (
-      <Shell>
-        <div className="h-48 animate-pulse rounded-2xl bg-white/40 dark:bg-white/5" />
+      <Shell title="Morning check-in" back={TODAY}>
+        <div className="h-48 animate-pulse rounded-2xl bg-fill-2" />
       </Shell>
     );
   }
 
-  return (
-    <Shell>
-      <Button variant="ghost" onClick={() => navigate("/dashboard")} className="mb-6">
-        <ArrowLeft className="h-4 w-4" /> Back to dashboard
-      </Button>
-
-      {!result ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Morning check-in</CardTitle>
-            <CardDescription>
-              List what you plan to do today, one per line. After you submit, we'll show you
-              five image associations to remember — you'll be tested on them tonight.
-              <br />
-              <span className="mt-1 inline-block text-xs text-slate-500 dark:text-slate-400">
-                You can only submit once per day. Make sure your list is complete before you submit.
-              </span>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={submit} className="flex flex-col gap-4">
+  if (!result) {
+    return (
+      <Shell
+        title="Morning check-in"
+        back={TODAY}
+        subtitle="List what you plan to do today, one per line. Then you'll see five things to remember for tonight's test."
+      >
+        <form onSubmit={submit}>
+          <Card>
+            <CardContent className="pt-4">
               <Textarea
+                aria-label="Today's plans"
                 placeholder={"e.g.\nMorning walk in the park\nGrocery shopping\nCall Mom\nFinish chapter 3"}
                 rows={7}
                 value={plans}
@@ -115,83 +108,69 @@ export function MorningPage() {
                 required
                 minLength={3}
               />
-              {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
-              <Button type="submit" loading={loading} size="lg">
-                Submit & show associations
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <header className="mb-6">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div>
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                  {alreadySubmitted ? "Today's morning check-in" : "Remember these"}
-                </h1>
-                <p className="mt-2 text-slate-600 dark:text-slate-400">
-                  Tonight we'll show you each cue word and ask you to name the object.
-                </p>
-              </div>
-              {alreadySubmitted && (
-                <div className="flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                  <Lock className="h-3.5 w-3.5" />
-                  Locked for today
-                </div>
-              )}
-            </div>
-            {alreadySubmitted && (
-              <div className="mt-4 rounded-xl border border-slate-200/60 dark:border-white/10 bg-white/50 dark:bg-white/[0.03] p-4 text-sm">
-                <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Your plans for today
-                </p>
-                <p className="mt-1 whitespace-pre-line text-slate-800 dark:text-slate-200">
-                  {result.planned_activities}
-                </p>
-                <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                  Submitted {new Date(result.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.
-                  You can come back to this page to review the associations at any time today,
-                  but you can't submit again until tomorrow.
-                </p>
-              </div>
-            )}
-          </header>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {result.presented_associations.map((a, i) => (
-              <motion.div
-                key={a.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.35, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <Card className="overflow-hidden">
-                  <div className="flex h-40 items-center justify-center bg-gradient-to-br from-brand-100 to-brand-300/40 dark:from-brand-700/30 dark:to-brand-500/20">
-                    <ImageIcon className="h-12 w-12 text-brand-600/50 dark:text-brand-300/60" />
-                  </div>
-                  <CardContent className="pt-5">
-                    <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Cue
-                    </p>
-                    <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                      "{a.cue_word}"
-                    </p>
-                    <p className="mt-2 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Object
-                    </p>
-                    <p className="text-base font-medium text-slate-800 dark:text-slate-200">
-                      {a.object_name}
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-          <Button onClick={() => navigate("/dashboard")} className="mt-8" size="lg">
-            Done — back to dashboard
+            </CardContent>
+          </Card>
+          <p className="px-4 pt-1.5 text-footnote text-label-2">
+            You can submit once per day, so make the list complete first.
+          </p>
+          {error && <p className="mt-3 px-1 text-subhead text-danger">{error}</p>}
+          <Button type="submit" loading={loading} size="lg" className="mt-5 w-full sm:w-auto">
+            Submit & show associations
           </Button>
-        </>
+        </form>
+        <Disclaimer />
+      </Shell>
+    );
+  }
+
+  return (
+    <Shell
+      title={alreadySubmitted ? "Today's morning check-in" : "Remember these"}
+      back={TODAY}
+      subtitle="Tonight we'll show you each cue word and ask you to name the object."
+    >
+      {alreadySubmitted && (
+        <GroupedList
+          className="mb-8"
+          header="Your plans for today"
+          footer={`Submitted at ${new Date(result.timestamp).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}. You can come back to review these at any time today, but you can't submit again until tomorrow.`}
+        >
+          <ListRow
+            icon={Lock}
+            tone="green"
+            title="Locked for today"
+            subtitle={<span className="whitespace-pre-line">{result.planned_activities}</span>}
+          />
+        </GroupedList>
       )}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {result.presented_associations.map((a, i) => (
+          <motion.div
+            key={a.id}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <Card className="overflow-hidden">
+              <div className="flex h-28 items-center justify-center bg-gradient-to-b from-ios-blue/12 to-ios-indigo/8">
+                <ImageIcon aria-hidden="true" className="h-9 w-9 text-ios-blue/60" strokeWidth={1.5} />
+              </div>
+              <div className="px-4 py-3">
+                <p className="text-caption font-semibold uppercase text-label-2">Cue</p>
+                <p className="text-body text-label">&ldquo;{a.cue_word}&rdquo;</p>
+                <p className="mt-2 text-caption font-semibold uppercase text-label-2">Object</p>
+                <p className="text-title3 font-semibold text-label">{a.object_name}</p>
+              </div>
+            </Card>
+          </motion.div>
+        ))}
+      </div>
+      <Button onClick={() => navigate("/dashboard")} className="mt-8 w-full sm:w-auto" size="lg">
+        Done
+      </Button>
 
       <Disclaimer />
     </Shell>

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, KeyRound, Mail, ShieldCheck, TriangleAlert } from "lucide-react";
-import { Shell } from "@/components/Shell";
+import { CheckCircle2, KeyRound, Mail, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Avatar, Shell } from "@/components/Shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { GroupedList, ListRow } from "@/components/ui/List";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Disclaimer } from "@/components/Disclaimer";
@@ -19,7 +20,7 @@ import { useAuth } from "@/lib/auth";
 
 export function SecurityPage() {
   const navigate = useNavigate();
-  const { user, signIn } = useAuth();
+  const { user, signIn, logout } = useAuth();
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -130,19 +131,17 @@ export function SecurityPage() {
   }
 
   return (
-    <Shell>
-      <Button variant="ghost" onClick={() => navigate("/dashboard")} className="mb-6">
-        <ArrowLeft className="h-4 w-4" /> Back to dashboard
-      </Button>
-
-      <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-          Settings
-        </h1>
-        <p className="mt-2 text-slate-600 dark:text-slate-400">
-          Your time zone, your password, and a way back in if you forget it.
-        </p>
-      </header>
+    <Shell title="Settings">
+      {/* The account banner at the top of iOS Settings. */}
+      <Card className="mb-8 flex items-center gap-4 px-4 py-3.5">
+        <Avatar name={user.username} className="h-[60px] w-[60px] text-title2" />
+        <div className="min-w-0">
+          <p className="truncate text-title3 font-semibold text-label">{user.username}</p>
+          <p className="text-subhead text-label-2">
+            Age {user.age} · wakes {user.wake_time.slice(0, 5)} · sleeps {user.sleep_time.slice(0, 5)}
+          </p>
+        </div>
+      </Card>
 
       <div className="space-y-6">
         <TimeZoneSettings />
@@ -150,8 +149,8 @@ export function SecurityPage() {
         {/* -------- password change -------- */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <KeyRound className="h-4 w-4 text-brand-500" /> Change password
+            <CardTitle className="text-body flex items-center gap-2">
+              <KeyRound className="h-4 w-4 text-ios-gray" strokeWidth={2.5} /> Change password
             </CardTitle>
             <CardDescription>
               Changing it signs you out everywhere else. You'll stay signed in here.
@@ -181,7 +180,7 @@ export function SecurityPage() {
                   onChange={(e) => setNext(e.target.value)}
                   required
                 />
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-footnote text-label-2">
                   At least 8 characters.
                 </p>
               </div>
@@ -196,13 +195,13 @@ export function SecurityPage() {
                   required
                 />
               </div>
-              {pwError && <p className="text-sm text-rose-600 dark:text-rose-400">{pwError}</p>}
+              {pwError && <p className="text-subhead text-danger">{pwError}</p>}
               {pwDone && (
-                <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                <p className="text-subhead text-success">
                   Password changed. Any other device is now signed out.
                 </p>
               )}
-              <Button type="submit" loading={pwBusy}>
+              <Button type="submit" loading={pwBusy} className="sm:self-start">
                 Change password
               </Button>
             </form>
@@ -212,8 +211,8 @@ export function SecurityPage() {
         {/* -------- recovery email -------- */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Mail className="h-4 w-4 text-brand-500" /> Recovery email
+            <CardTitle className="text-body flex items-center gap-2">
+              <Mail className="h-4 w-4 text-ios-blue" strokeWidth={2.5} /> Recovery email
             </CardTitle>
             <CardDescription>
               Optional. With a confirmed address you can have a reset link
@@ -222,10 +221,10 @@ export function SecurityPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {status?.email && (
-              <p className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <p className="flex items-start gap-2 text-subhead text-label">
                 {status.email_verified ? (
                   <>
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                     <span>
                       <strong>{status.email}</strong> is confirmed and can reset
                       your password.
@@ -233,7 +232,7 @@ export function SecurityPage() {
                   </>
                 ) : (
                   <>
-                    <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                     <span>
                       <strong>{status.email}</strong> is not confirmed yet, so it
                       cannot be used to reset your password. Check your inbox for
@@ -245,7 +244,7 @@ export function SecurityPage() {
             )}
 
             {status && !status.email_delivery_enabled && (
-              <p className="rounded-xl bg-amber-500/10 px-4 py-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+              <p className="rounded-xl bg-ios-orange/12 px-4 py-3 text-footnote text-label">
                 This server has no mail configured, so nothing is actually sent —
                 confirmation and reset links are written to the server log
                 instead. Recovery codes below work regardless.
@@ -275,18 +274,18 @@ export function SecurityPage() {
                   onChange={(e) => setEmailPassword(e.target.value)}
                   required
                 />
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-footnote text-label-2">
                   Required so that nobody using your unlocked device can point
                   recovery at their own inbox.
                 </p>
               </div>
               {emailError && (
-                <p className="text-sm text-rose-600 dark:text-rose-400">{emailError}</p>
+                <p className="text-subhead text-danger">{emailError}</p>
               )}
               {emailNote && (
-                <p className="text-sm text-emerald-700 dark:text-emerald-300">{emailNote}</p>
+                <p className="text-subhead text-success">{emailNote}</p>
               )}
-              <Button type="submit" loading={emailBusy} variant="secondary">
+              <Button type="submit" loading={emailBusy} variant="secondary" className="sm:self-start">
                 {status?.email ? "Update address" : "Add address"}
               </Button>
             </form>
@@ -296,8 +295,8 @@ export function SecurityPage() {
         {/* -------- recovery codes -------- */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-brand-500" /> Recovery codes
+            <CardTitle className="text-body flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-ios-green" strokeWidth={2.5} /> Recovery codes
             </CardTitle>
             <CardDescription>
               Single-use codes that get you back in if you forget your password,
@@ -306,7 +305,7 @@ export function SecurityPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {status && !codes && (
-              <p className="text-sm text-slate-700 dark:text-slate-300">
+              <p className="text-subhead text-label">
                 {status.has_codes
                   ? `${status.codes_remaining} unused code${
                       status.codes_remaining === 1 ? "" : "s"
@@ -317,15 +316,15 @@ export function SecurityPage() {
 
             {codes && (
               <div>
-                <p className="flex items-start gap-2 rounded-xl bg-amber-500/10 px-4 py-3 text-sm leading-relaxed text-amber-900 dark:text-amber-200">
-                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                <p className="flex items-start gap-2 rounded-xl bg-ios-orange/12 px-4 py-3 text-subhead text-label">
+                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-ios-orange" />
                   {codeWarning}
                 </p>
                 <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {codes.map((c) => (
                     <li
                       key={c}
-                      className="rounded-lg bg-slate-900/[0.04] dark:bg-white/[0.06] px-3 py-2 text-center font-mono text-sm tracking-wider text-slate-800 dark:text-slate-200"
+                      className="rounded-lg bg-fill px-3 py-2 text-center font-mono text-subhead tracking-wider text-label"
                     >
                       {c}
                     </li>
@@ -341,13 +340,13 @@ export function SecurityPage() {
               </div>
             )}
 
-            {codeError && <p className="text-sm text-rose-600 dark:text-rose-400">{codeError}</p>}
+            {codeError && <p className="text-subhead text-danger">{codeError}</p>}
 
             <Button variant={codes ? "ghost" : "primary"} onClick={generateCodes} loading={codeBusy}>
               {status?.has_codes ? "Generate a new set" : "Generate recovery codes"}
             </Button>
             {status?.has_codes && (
-              <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              <p className="text-footnote text-label-2">
                 Generating a new set immediately cancels every unused code from
                 before — do that if you think somebody else has seen them.
               </p>
@@ -355,6 +354,18 @@ export function SecurityPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Signing out lives at the foot of Settings, as it does on iOS. */}
+      <GroupedList className="mt-8">
+        <ListRow
+          title="Log Out"
+          destructive
+          onClick={() => {
+            logout();
+            navigate("/login");
+          }}
+        />
+      </GroupedList>
 
       <Disclaimer />
     </Shell>

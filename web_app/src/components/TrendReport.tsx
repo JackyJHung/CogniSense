@@ -8,8 +8,9 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { AlertTriangle, CheckCircle2, Info, LineChart } from "lucide-react";
+import { AlertTriangle, ChartLine, CheckCircle2, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { api, type Trend, type TrendPoint } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -54,52 +55,35 @@ export function TrendReport({ userId }: { userId: number }) {
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <LineChart className="h-4 w-4 text-brand-500" /> Your trend
+          <CardTitle className="flex items-center gap-1.5 text-subhead font-semibold text-ios-pink">
+            <ChartLine className="h-4 w-4" strokeWidth={2.5} /> Your trend
           </CardTitle>
           <CardDescription>
             Each dot is one day&apos;s score. The line is your 7-day average and the
             shading its 95% range.
           </CardDescription>
         </div>
-        <div
-          role="group"
-          aria-label="Time range"
-          className="inline-flex shrink-0 rounded-xl bg-slate-900/5 p-1 dark:bg-white/5"
-        >
-          {WINDOWS.map((w) => (
-            <button
-              key={w}
-              type="button"
-              aria-pressed={w === windowDays}
-              onClick={() => {
-                setError(null);
-                setWindowDays(w);
-              }}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400",
-                w === windowDays
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-white/15 dark:text-slate-100"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
-              )}
-            >
-              {w} days
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Time range"
+          value={windowDays}
+          onChange={(w) => {
+            setError(null);
+            setWindowDays(w);
+          }}
+          options={WINDOWS.map((w) => ({ value: w, label: `${w} days` }))}
+        />
       </CardHeader>
       <CardContent>
-        {error && <p className="mb-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+        {error && <p className="mb-3 text-subhead text-danger">{error}</p>}
         {!trend ? (
-          !error && <div className="h-72 animate-pulse rounded-xl bg-white/40 dark:bg-white/5" />
+          !error && <div className="h-72 animate-pulse rounded-xl bg-fill-2" />
         ) : (
           <div className={cn("transition-opacity", stale && "opacity-50")} aria-busy={stale}>
             <TrendSummary trend={trend} id={summaryId} />
             <Legend hasBaseline={trend.baseline_avg != null} />
             <TrendChart trend={trend} labelledBy={summaryId} />
             <TrendTable trend={trend} />
-            <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            <p className="mt-3 text-footnote text-label-2">
               Days are counted in {trend.timezone.replaceAll("_", " ")}. A day without a
               dot had no evening check-in; it is left as a gap, not counted as zero. If
               the test was taken twice in a day, only the first attempt counts.
@@ -117,7 +101,7 @@ function TrendSummary({ trend, id }: { trend: Trend; id: string }) {
   const t = trend;
   return (
     <div className="mb-4 space-y-3">
-      <p id={id} className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+      <p id={id} className="text-subhead text-label">
         Last {t.window_days} days: you checked in on {t.n_scored_days} of them.{" "}
         {t.recent_avg != null && (
           <>
@@ -150,24 +134,24 @@ function TrendStatus({ trend: t }: { trend: Trend }) {
   if (t.elevated_concern && t.concern_reason) {
     return (
       <StatusLine
-        icon={<AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />}
+        icon={<AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-ios-orange" strokeWidth={2.25} />}
         label="Attention"
         body={t.concern_reason}
-        className="bg-amber-500/10 text-amber-900 dark:text-amber-200"
+        className="bg-ios-orange/12 text-label"
       />
     );
   }
   if (t.inconclusive && t.inconclusive_reason) {
     return (
       <StatusLine
-        icon={<Info className="mt-0.5 h-4 w-4 shrink-0" />}
+        icon={<Info className="mt-0.5 h-4 w-4 shrink-0 text-ios-blue" strokeWidth={2.25} />}
         label="Not enough to say yet"
         body={t.inconclusive_reason}
-        className="bg-sky-500/10 text-sky-900 dark:text-sky-200"
+        className="bg-ios-blue/10 text-label"
       />
     );
   }
-  const neutral = "bg-slate-900/[0.04] text-slate-700 dark:bg-white/[0.05] dark:text-slate-300";
+  const neutral = "bg-fill-2 text-label";
   const lo = t.change_ci_low_pct;
   const hi = t.change_ci_high_pct;
   if (t.change_pct == null || lo == null || hi == null) {
@@ -182,7 +166,7 @@ function TrendStatus({ trend: t }: { trend: Trend }) {
   if (hi < 0) {
     return (
       <StatusLine
-        icon={<Info className="mt-0.5 h-4 w-4 shrink-0" />}
+        icon={<Info className="mt-0.5 h-4 w-4 shrink-0 text-label-2" strokeWidth={2.25} />}
         label="A small decline"
         body={`Compared with your baseline: ${change}. That is more than day-to-day variation, but smaller than the drop this app treats as a reason for attention. Keep checking in.`}
         className={neutral}
@@ -192,7 +176,7 @@ function TrendStatus({ trend: t }: { trend: Trend }) {
   if (lo > 0) {
     return (
       <StatusLine
-        icon={<Info className="mt-0.5 h-4 w-4 shrink-0" />}
+        icon={<Info className="mt-0.5 h-4 w-4 shrink-0 text-label-2" strokeWidth={2.25} />}
         label="Above your baseline"
         body={`Compared with your baseline: ${change}.`}
         className={neutral}
@@ -201,7 +185,7 @@ function TrendStatus({ trend: t }: { trend: Trend }) {
   }
   return (
     <StatusLine
-      icon={<CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
+      icon={<CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-label-2" strokeWidth={2.25} />}
       label="No change beyond day-to-day variation"
       body={`Compared with your baseline: ${change}.`}
       className={neutral}
@@ -211,7 +195,7 @@ function TrendStatus({ trend: t }: { trend: Trend }) {
 
 function StatusLine(props: { icon: ReactNode; label: string; body: string; className: string }) {
   return (
-    <div className={cn("flex items-start gap-2 rounded-xl px-4 py-3 text-sm leading-relaxed", props.className)}>
+    <div className={cn("flex items-start gap-2 rounded-xl px-4 py-3 text-subhead ", props.className)}>
       {props.icon}
       <p>
         <span className="font-semibold">{props.label}.</span> {props.body}
@@ -225,29 +209,29 @@ function StatusLine(props: { icon: ReactNode; label: string; body: string; class
 function Legend({ hasBaseline }: { hasBaseline: boolean }) {
   const key = "flex items-center gap-1.5";
   return (
-    <ul className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
+    <ul className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-footnote text-label-2">
       <li className={key}>
         <svg width="10" height="10" aria-hidden="true">
-          <circle cx="5" cy="5" r="4" className="fill-brand-600" />
+          <circle cx="5" cy="5" r="4" className="fill-tint" />
         </svg>
         Daily score
       </li>
       <li className={key}>
         <svg width="16" height="10" aria-hidden="true">
-          <line x1="1" y1="5" x2="15" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-brand-600" />
+          <line x1="1" y1="5" x2="15" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-tint" />
         </svg>
         7-day average
       </li>
       <li className={key}>
         <svg width="16" height="10" aria-hidden="true">
-          <rect width="16" height="10" rx="2" className="fill-brand-600/15" />
+          <rect width="16" height="10" rx="2" className="fill-tint/15" />
         </svg>
         95% range of the average
       </li>
       {hasBaseline && (
         <li className={key}>
           <svg width="16" height="10" aria-hidden="true">
-            <line x1="1" y1="5" x2="15" y2="5" strokeWidth="1.5" className="stroke-slate-500 dark:stroke-slate-400" />
+            <line x1="1" y1="5" x2="15" y2="5" strokeWidth="1.5" className="stroke-ios-gray" />
           </svg>
           Your baseline
         </li>
@@ -335,7 +319,7 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
   return (
     <div
       ref={wrapRef}
-      className="relative w-full select-none rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+      className="relative w-full select-none rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-tint/50"
       style={{ height: HEIGHT }}
       tabIndex={0}
       aria-label="Chart of your daily scores. Use the left and right arrow keys to read each day."
@@ -357,7 +341,7 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
                 y2={y(v)}
                 strokeWidth={1}
                 shapeRendering="crispEdges"
-                className="stroke-slate-200 dark:stroke-white/10"
+                className="stroke-separator"
               />
               <text
                 x={LEFT - 8}
@@ -365,7 +349,7 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
                 dy="0.32em"
                 textAnchor="end"
                 fontSize={11}
-                className="fill-slate-500 tabular-nums dark:fill-slate-400"
+                className="fill-label-2 tabular-nums"
               >
                 {Math.round(v * 100)}%
               </text>
@@ -378,7 +362,7 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
               y={HEIGHT - 8}
               textAnchor={i === n - 1 ? "end" : "middle"}
               fontSize={11}
-              className="fill-slate-500 dark:fill-slate-400"
+              className="fill-label-2"
             >
               {i === n - 1 ? "Today" : shortDate(points[i].date)}
             </text>
@@ -396,10 +380,10 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
                 y2={y(points[run[0]].rolling_ci_low!)}
                 strokeWidth={6}
                 strokeLinecap="round"
-                className="stroke-brand-600/15"
+                className="stroke-tint/15"
               />
             ) : (
-              <path key={run[0]} d={bandPath(run, points, x, y)} className="fill-brand-600/15" />
+              <path key={run[0]} d={bandPath(run, points, x, y)} className="fill-tint/15" />
             ),
           )}
 
@@ -411,7 +395,7 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
                 y1={y(baseline)}
                 y2={y(baseline)}
                 strokeWidth={1.5}
-                className="stroke-slate-500 dark:stroke-slate-400"
+                className="stroke-ios-gray"
               />
               <text
                 x={LEFT + plotW}
@@ -420,7 +404,7 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
                 fontSize={11}
                 paintOrder="stroke"
                 strokeWidth={3}
-                className="fill-slate-600 stroke-white dark:fill-slate-300 dark:stroke-black"
+                className="fill-label-2 stroke-surface"
               >
                 Baseline {pct(baseline)}
               </text>
@@ -439,7 +423,7 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
                 strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="stroke-brand-600"
+                className="stroke-tint"
               />
             ))}
 
@@ -451,7 +435,7 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
               y2={TOP + plotH}
               strokeWidth={1}
               shapeRendering="crispEdges"
-              className="stroke-slate-400 dark:stroke-slate-500"
+              className="stroke-label-3"
             />
           )}
 
@@ -465,7 +449,7 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
                 cy={y(pt.score)}
                 r={i === active ? 6 : 4}
                 strokeWidth={2}
-                className="fill-brand-600 stroke-white dark:stroke-black"
+                className="fill-tint stroke-surface"
               />
             ),
           )}
@@ -476,7 +460,7 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
               y={TOP + plotH / 2}
               textAnchor="middle"
               fontSize={13}
-              className="fill-slate-500 dark:fill-slate-400"
+              className="fill-label-2"
             >
               No evening check-ins in these {n} days
             </text>
@@ -487,38 +471,38 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
       {p && active != null && (
         <div
           aria-live="polite"
-          className="pointer-events-none absolute top-1 z-10 w-52 -translate-x-1/2 rounded-xl border border-slate-200/80 bg-white/95 px-3 py-2 text-xs shadow-lg backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
+          className="pointer-events-none absolute top-1 z-10 w-52 -translate-x-1/2 rounded-xl bg-bar px-3 py-2 text-footnote shadow-[0_8px_24px_rgb(0_0_0/0.14)] ring-[0.5px] ring-separator backdrop-blur-xl backdrop-saturate-[1.8]"
           style={{ left: Math.min(Math.max(x(active), 108), Math.max(width - 108, 108)) }}
         >
-          <p className="mb-1 font-medium text-slate-500 dark:text-slate-400">{longDate(p.date)}</p>
+          <p className="mb-1 font-medium text-label-2">{longDate(p.date)}</p>
           <p className="flex items-baseline gap-2">
             <svg width="10" height="10" aria-hidden="true" className="shrink-0 self-center">
-              <circle cx="5" cy="5" r="4" className="fill-brand-600" />
+              <circle cx="5" cy="5" r="4" className="fill-tint" />
             </svg>
             {p.score != null ? (
               <>
-                <strong className="text-sm text-slate-900 dark:text-slate-100">{pct(p.score)}</strong>
-                <span className="text-slate-500 dark:text-slate-400">
+                <strong className="text-subhead text-label">{pct(p.score)}</strong>
+                <span className="text-label-2">
                   daily score{p.attempts > 1 ? ` (first of ${p.attempts} attempts)` : ""}
                 </span>
               </>
             ) : (
-              <span className="text-slate-500 dark:text-slate-400">No check-in this day</span>
+              <span className="text-label-2">No check-in this day</span>
             )}
           </p>
           <p className="mt-1 flex items-baseline gap-2">
             <svg width="12" height="10" aria-hidden="true" className="shrink-0 self-center">
-              <line x1="1" y1="5" x2="11" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-brand-600" />
+              <line x1="1" y1="5" x2="11" y2="5" strokeWidth="2" strokeLinecap="round" className="stroke-tint" />
             </svg>
             {range(p.rolling_ci_low, p.rolling_ci_high) ? (
               <>
-                <strong className="text-sm text-slate-900 dark:text-slate-100">{pct(p.rolling_mean!)}</strong>
-                <span className="text-slate-500 dark:text-slate-400">
+                <strong className="text-subhead text-label">{pct(p.rolling_mean!)}</strong>
+                <span className="text-label-2">
                   7-day average, range {range(p.rolling_ci_low, p.rolling_ci_high)}
                 </span>
               </>
             ) : (
-              <span className="text-slate-500 dark:text-slate-400">
+              <span className="text-label-2">
                 7-day average: too few days for a range
               </span>
             )}
@@ -535,15 +519,15 @@ function TrendChart({ trend, labelledBy }: { trend: Trend; labelledBy: string })
 function TrendTable({ trend }: { trend: Trend }) {
   return (
     <details className="mt-4">
-      <summary className="cursor-pointer text-sm font-medium text-brand-700 hover:underline dark:text-brand-300">
+      <summary className="cursor-pointer text-subhead font-medium text-link hover:underline">
         Show the numbers
       </summary>
-      <div className="mt-2 max-h-72 overflow-auto rounded-xl ring-1 ring-slate-200/70 dark:ring-white/10">
-        <table className="w-full text-left text-xs tabular-nums">
+      <div className="mt-2 max-h-72 overflow-auto rounded-xl ring-[0.5px] ring-separator">
+        <table className="w-full text-left text-footnote tabular-nums">
           <caption className="sr-only">
             Daily scores and 7-day averages for the last {trend.window_days} days, newest first
           </caption>
-          <thead className="sticky top-0 bg-white/95 text-slate-500 dark:bg-slate-900/95 dark:text-slate-400">
+          <thead className="sticky top-0 bg-surface text-label-2">
             <tr>
               <th scope="col" className="px-3 py-2 font-medium">Day</th>
               <th scope="col" className="px-3 py-2 font-medium">Score</th>
@@ -551,12 +535,12 @@ function TrendTable({ trend }: { trend: Trend }) {
               <th scope="col" className="px-3 py-2 font-medium">95% range</th>
             </tr>
           </thead>
-          <tbody className="text-slate-700 dark:text-slate-300">
+          <tbody className="text-label">
             {[...trend.points].reverse().map((p) => (
-              <tr key={p.date} className="border-t border-slate-200/60 dark:border-white/5">
+              <tr key={p.date} className="border-t-[0.5px] border-separator">
                 <th scope="row" className="px-3 py-1.5 font-normal">{longDate(p.date)}</th>
                 <td className="px-3 py-1.5">
-                  {p.score != null ? pct(p.score) : <span className="text-slate-400">no check-in</span>}
+                  {p.score != null ? pct(p.score) : <span className="text-label-3">no check-in</span>}
                 </td>
                 <td className="px-3 py-1.5">
                   {range(p.rolling_ci_low, p.rolling_ci_high) ? pct(p.rolling_mean!) : "—"}

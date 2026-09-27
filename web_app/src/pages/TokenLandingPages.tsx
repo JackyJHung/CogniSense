@@ -55,7 +55,7 @@ export function VerifyEmailPage() {
   const message = !token ? "That link is missing its confirmation code." : (outcome?.message ?? "");
 
   return (
-    <CenteredShell>
+    <CenteredShell title="Confirm Your Email">
       <Card>
         <CardHeader>
           <CardTitle>
@@ -64,13 +64,13 @@ export function VerifyEmailPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {state === "done" && (
-            <p className="flex items-start gap-2 text-sm leading-relaxed text-emerald-700 dark:text-emerald-300">
+            <p className="flex items-start gap-2 text-subhead text-success">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
               {message}
             </p>
           )}
           {state === "failed" && (
-            <p className="flex items-start gap-2 text-sm leading-relaxed text-amber-900 dark:text-amber-200">
+            <p className="flex items-start gap-2 text-subhead text-label">
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
               {message}
             </p>
@@ -128,7 +128,7 @@ export function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <CenteredShell>
+      <CenteredShell title="Reset Your Password">
         <Card>
           <CardHeader>
             <CardTitle>Reset link incomplete</CardTitle>
@@ -148,7 +148,7 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <CenteredShell>
+    <CenteredShell title="Reset Your Password">
       <Card>
         <CardHeader>
           <CardTitle>Choose a new password</CardTitle>
@@ -170,7 +170,7 @@ export function ResetPasswordPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-footnote text-label-2">
                 At least 8 characters.
               </p>
             </div>
@@ -185,7 +185,7 @@ export function ResetPasswordPage() {
                 required
               />
             </div>
-            {error && <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+            {error && <p className="text-subhead text-danger">{error}</p>}
             <Button type="submit" loading={loading}>
               Set new password
             </Button>

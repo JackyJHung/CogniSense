@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, ImagePlus, ListChecks, Plus, Sparkles } from "lucide-react";
+import { Check, ImagePlus, Plus, Sparkles } from "lucide-react";
 import { Shell } from "@/components/Shell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -32,7 +31,6 @@ function fetchReminderState(userId: number) {
 }
 
 export function RemindersPage() {
-  const navigate = useNavigate();
   const { user } = useAuth();
 
   const [items, setItems] = useState<ReminderItem[]>([]);
@@ -169,26 +167,49 @@ export function RemindersPage() {
   const pending = items.filter((i) => i.status === "pending");
 
   return (
-    <Shell>
-      <Button variant="ghost" onClick={() => navigate("/dashboard")} className="mb-6">
-        <ArrowLeft className="h-4 w-4" /> Back to dashboard
-      </Button>
-
-      <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-          Things to remember
-        </h1>
-        <p className="mt-2 text-slate-600 dark:text-slate-400">
-          Save what you mean to do. Later we'll ask what you remember — and then
-          show you the list either way.
-        </p>
-      </header>
-
-      {error && <p className="mb-4 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
+    <Shell
+      title="Things to remember"
+      subtitle="Save what you mean to do. Later we'll ask what you remember, and then show you the list either way."
+    >
+      {error && <p className="mb-4 px-1 text-subhead text-danger">{error}</p>}
 
       {/* ---------------- LIST ---------------- */}
       {phase === "list" && (
-        <div className="space-y-6">
+        <div className="space-y-8">
+          <section>
+            <h2 className="px-4 pb-1.5 text-footnote uppercase text-label-2">Your list</h2>
+            <ul className="overflow-hidden rounded-2xl bg-surface">
+              {pending.length === 0 ? (
+                <li className="px-4 py-3 text-body text-label-2">Nothing outstanding right now.</li>
+              ) : (
+                pending.map((item) => (
+                  <li key={item.id} className="group flex items-center gap-3 pl-4">
+                    <span
+                      aria-hidden="true"
+                      className="h-[22px] w-[22px] shrink-0 rounded-full border-[1.5px] border-label-3"
+                    />
+                    <span className="flex-1 border-b-[0.5px] border-separator py-3 pr-4 text-body text-label group-last:border-b-0">
+                      {itemText(item)}
+                    </span>
+                  </li>
+                ))
+              )}
+            </ul>
+            <p className="px-4 pt-1.5 text-footnote text-label-2">
+              {pending.length === 0
+                ? "Add something below, and you'll be asked about it later."
+                : `${pending.length} thing${pending.length === 1 ? "" : "s"} to do. Test yourself before you look.`}
+            </p>
+            <Button
+              className="mt-4 w-full sm:w-auto"
+              onClick={startCheck}
+              loading={busy}
+              disabled={pending.length === 0}
+            >
+              <Sparkles aria-hidden="true" className="h-4 w-4" /> Test me now
+            </Button>
+          </section>
+
           <Card>
             <CardHeader>
               <CardTitle>Add something</CardTitle>
@@ -204,6 +225,7 @@ export function RemindersPage() {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder="e.g. call the dentist about the crown"
+                  rows={3}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -214,9 +236,9 @@ export function RemindersPage() {
                   onChange={(e) => setDraftLabel(e.target.value)}
                   placeholder="e.g. dentist"
                 />
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  If you add a photo, give it a short name too — we need words to
-                  compare against what you remember.
+                <p className="px-1 text-footnote text-label-2">
+                  If you add a photo, give it a short name too: we need words to compare against
+                  what you remember.
                 </p>
               </div>
               <div className="flex flex-col gap-1.5">
@@ -226,54 +248,16 @@ export function RemindersPage() {
                   type="file"
                   accept="image/*"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  className="block w-full text-sm text-slate-600 dark:text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-500/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700 dark:file:text-brand-300"
+                  className="block w-full text-subhead text-label-2 file:mr-3 file:h-8 file:rounded-full file:border-0 file:bg-fill file:px-4 file:text-subhead file:font-semibold file:text-link"
                 />
                 {file && (
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                    <ImagePlus className="h-3.5 w-3.5" /> {file.name}
+                  <p className="flex items-center gap-1.5 px-1 text-footnote text-label-2">
+                    <ImagePlus aria-hidden="true" className="h-3.5 w-3.5" /> {file.name}
                   </p>
                 )}
               </div>
               <Button onClick={addItem} loading={busy} disabled={!draft.trim() && !draftLabel.trim()}>
-                <Plus className="h-4 w-4" /> Save it
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex-row items-center justify-between">
-              <div>
-                <CardTitle>Your list</CardTitle>
-                <CardDescription>
-                  {pending.length === 0
-                    ? "Nothing outstanding right now."
-                    : `${pending.length} thing${pending.length === 1 ? "" : "s"} to do.`}
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {pending.length > 0 && (
-                <ul className="space-y-2">
-                  {pending.map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex items-start gap-3 rounded-xl bg-white/40 dark:bg-white/[0.03] px-4 py-3 ring-1 ring-slate-200/40 dark:ring-white/5"
-                    >
-                      <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
-                      <span className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-                        {itemText(item)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <Button
-                className="mt-4"
-                onClick={startCheck}
-                loading={busy}
-                disabled={pending.length === 0}
-              >
-                <Sparkles className="h-4 w-4" /> Test me now
+                <Plus aria-hidden="true" className="h-4 w-4" /> Save it
               </Button>
             </CardContent>
           </Card>
@@ -289,26 +273,27 @@ export function RemindersPage() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <Card>
             <CardHeader>
-              <CardTitle>{check.prompt}</CardTitle>
+              <CardTitle className="text-title3">{check.prompt}</CardTitle>
               <CardDescription>
                 You have {check.n_items_active} thing
-                {check.n_items_active === 1 ? "" : "s"} saved. Write down whatever
-                comes to mind — one is enough.
+                {check.n_items_active === 1 ? "" : "s"} saved. Write down whatever comes to mind;
+                one is enough.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Textarea
+                aria-label="What you remember"
                 value={recall}
                 onChange={(e) => setRecall(e.target.value)}
                 placeholder="What did you mean to do?"
                 autoFocus
               />
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button onClick={submitRecall} loading={busy}>
                   Done
                 </Button>
                 <Button variant="ghost" onClick={submitRecall} loading={busy}>
-                  I can't remember — just show me
+                  I can't remember, just show me
                 </Button>
               </div>
             </CardContent>
@@ -318,92 +303,89 @@ export function RemindersPage() {
 
       {/* ---------------- RESULT + the aid ---------------- */}
       {phase === "result" && result && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-          <Card
-            className={
-              result.passed
-                ? "border-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-500/10"
-                : "border-sky-500/40 bg-sky-50/60 dark:bg-sky-500/10"
-            }
-          >
-            <CardContent className="pt-6">
-              <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-200">
-                {result.feedback}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+          <Card className="flex items-start gap-3 px-4 py-3.5">
+            <span
+              aria-hidden="true"
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white ${
+                result.passed ? "bg-ios-green" : "bg-ios-blue"
+              }`}
+            >
+              {result.passed ? (
+                <Check className="h-5 w-5" strokeWidth={3} />
+              ) : (
+                <Sparkles className="h-5 w-5" />
+              )}
+            </span>
+            <div>
+              <p className="text-body font-semibold text-label">{result.feedback}</p>
+              <p className="mt-0.5 text-subhead text-label-2">
+                Remembered {result.n_recalled} of {result.n_active}. One check on its own doesn't
+                mean anything; the pattern over weeks is what matters.
               </p>
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                Remembered {result.n_recalled} of {result.n_active}. One check on its
-                own doesn't mean anything — the pattern over weeks is what matters.
-              </p>
-            </CardContent>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Your list</CardTitle>
-              <CardDescription>Tick anything you've already done.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {result.items.map((item) => {
-                  const matched = result.matches.find((m) => m.item_id === item.id)?.matched;
-                  const isSelected = selected.includes(item.id);
-                  return (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelected((s) =>
-                            s.includes(item.id) ? s.filter((x) => x !== item.id) : [...s, item.id],
-                          )
-                        }
-                        className={`flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left ring-1 transition ${
-                          isSelected
-                            ? "bg-emerald-500/10 ring-emerald-500/40"
-                            : "bg-white/40 dark:bg-white/[0.03] ring-slate-200/40 dark:ring-white/5"
+          <section>
+            <h2 className="px-4 pb-1.5 text-footnote uppercase text-label-2">Your list</h2>
+            <ul className="overflow-hidden rounded-2xl bg-surface">
+              {result.items.map((item) => {
+                const matched = result.matches.find((m) => m.item_id === item.id)?.matched;
+                const isSelected = selected.includes(item.id);
+                return (
+                  <li key={item.id} className="group">
+                    <button
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() =>
+                        setSelected((s) =>
+                          s.includes(item.id) ? s.filter((x) => x !== item.id) : [...s, item.id],
+                        )
+                      }
+                      className="flex w-full items-center gap-3 pl-4 text-left outline-none transition-colors hover:bg-fill-2 focus-visible:bg-fill"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full ${
+                          isSelected ? "bg-ios-blue text-white" : "border-[1.5px] border-label-3"
                         }`}
                       >
-                        <span
-                          className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                            isSelected
-                              ? "border-emerald-500 bg-emerald-500 text-white"
-                              : "border-slate-300 dark:border-white/20"
-                          }`}
-                        >
-                          {isSelected && <Check className="h-3 w-3" />}
-                        </span>
-                        <span className="flex-1 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                        {isSelected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                      </span>
+                      <span className="flex flex-1 items-center gap-3 border-b-[0.5px] border-separator py-3 pr-4 group-last:border-b-0">
+                        <span className={`flex-1 text-body ${isSelected ? "text-label-2 line-through" : "text-label"}`}>
                           {itemText(item)}
                         </span>
                         {matched && (
-                          <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                            you said this
+                          <span className="shrink-0 rounded-full bg-ios-green/15 px-2 py-0.5 text-caption font-semibold text-success">
+                            You said this
                           </span>
                         )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              <div className="mt-4 flex gap-2">
-                <Button onClick={markDone} loading={busy} disabled={selected.length === 0}>
-                  <Check className="h-4 w-4" /> Mark {selected.length || ""} done
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setPhase("list");
-                    setResult(null);
-                  }}
-                >
-                  Back to list
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="px-4 pt-1.5 text-footnote text-label-2">Tick anything you've already done.</p>
+          </section>
 
-          <p className="rounded-xl bg-slate-900/[0.03] dark:bg-white/[0.03] px-4 py-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-            {result.memory_aid_disclaimer}
-          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={markDone} loading={busy} disabled={selected.length === 0}>
+              <Check aria-hidden="true" className="h-4 w-4" /> Mark {selected.length || ""} done
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPhase("list");
+                setResult(null);
+              }}
+            >
+              Back to list
+            </Button>
+          </div>
+
+          <p className="px-4 text-footnote text-label-2">{result.memory_aid_disclaimer}</p>
         </motion.div>
       )}
 
@@ -414,54 +396,46 @@ export function RemindersPage() {
 
 function ScoreCard({ score }: { score: ProspectiveScore }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">How you've been doing</CardTitle>
-        <CardDescription>
-          Across {score.n_checks} check{score.n_checks === 1 ? "" : "s"}.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {score.recall_rate == null ? (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            {score.trend_note ?? "No checks answered yet."}
+    <Card className="px-5 py-4">
+      <p className="text-subhead font-semibold text-ios-blue">How you've been doing</p>
+      <p className="mt-0.5 text-footnote text-label-2">
+        Across {score.n_checks} check{score.n_checks === 1 ? "" : "s"}.
+      </p>
+      {score.recall_rate == null ? (
+        <p className="mt-3 text-subhead text-label-2">{score.trend_note ?? "No checks answered yet."}</p>
+      ) : (
+        <>
+          <p className="mt-2 font-rounded text-large-title font-bold tracking-tight text-label tabular-nums">
+            {Math.round(score.recall_rate * 100)}%
           </p>
-        ) : (
-          <>
-            <p className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-              {Math.round(score.recall_rate * 100)}%
+          <p className="mt-0.5 text-footnote text-label-2">
+            {score.recall_rate_ci_low != null && score.recall_rate_ci_high != null
+              ? `of your reminders recalled unprompted (95% range ${Math.round(
+                  score.recall_rate_ci_low * 100,
+                )}–${Math.round(score.recall_rate_ci_high * 100)}%)`
+              : "of your reminders recalled unprompted — too few checks for a range yet"}
+          </p>
+          {score.trend_note && (
+            <p className="mt-3 text-subhead text-label-2">
+              {score.trend_note}
+              {score.trend_available &&
+                score.change_pct != null &&
+                score.change_ci_low_pct != null &&
+                score.change_ci_high_pct != null && (
+                  <span className="mt-1 block text-footnote text-label-2 tabular-nums">
+                    Change vs. your earlier baseline: {score.change_pct > 0 ? "+" : ""}
+                    {score.change_pct.toFixed(0)}% (95% range{" "}
+                    {score.change_ci_low_pct > 0 ? "+" : ""}
+                    {score.change_ci_low_pct.toFixed(0)}% to{" "}
+                    {score.change_ci_high_pct > 0 ? "+" : ""}
+                    {score.change_ci_high_pct.toFixed(0)}%)
+                  </span>
+                )}
             </p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {score.recall_rate_ci_low != null && score.recall_rate_ci_high != null
-                ? `of your reminders recalled unprompted (95% range ${Math.round(
-                    score.recall_rate_ci_low * 100,
-                  )}–${Math.round(score.recall_rate_ci_high * 100)}%)`
-                : "of your reminders recalled unprompted — too few checks for a range yet"}
-            </p>
-            {score.trend_note && (
-              <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                {score.trend_note}
-                {score.trend_available &&
-                  score.change_pct != null &&
-                  score.change_ci_low_pct != null &&
-                  score.change_ci_high_pct != null && (
-                    <span className="block mt-1 text-xs text-slate-500 dark:text-slate-500">
-                      Change vs. your earlier baseline: {score.change_pct > 0 ? "+" : ""}
-                      {score.change_pct.toFixed(0)}% (95% range{" "}
-                      {score.change_ci_low_pct > 0 ? "+" : ""}
-                      {score.change_ci_low_pct.toFixed(0)}% to{" "}
-                      {score.change_ci_high_pct > 0 ? "+" : ""}
-                      {score.change_ci_high_pct.toFixed(0)}%)
-                    </span>
-                  )}
-              </p>
-            )}
-          </>
-        )}
-        <p className="mt-4 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-          {score.memory_aid_disclaimer}
-        </p>
-      </CardContent>
+          )}
+        </>
+      )}
+      <p className="mt-4 text-footnote text-label-2">{score.memory_aid_disclaimer}</p>
     </Card>
   );
 }
